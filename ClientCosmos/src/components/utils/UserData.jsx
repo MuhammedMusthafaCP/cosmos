@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import Cookies from "js-cookie";
+import { API_URL } from "../../config";
 
 const useUserData = () => {
   const [user, setUser] = useState(null);
@@ -12,7 +13,7 @@ const useUserData = () => {
   const getUserdata = async (id) => {
     try {
       const response = await axios.get(
-        `https://s50-musthafa-capstone-cosmos.onrender.com/users/getAsingleUser/${id}`
+        `${API_URL}/users/getAsingleUser/${id}`
       );
       setUserData(response.data);
     } catch (err) {
@@ -24,11 +25,10 @@ const useUserData = () => {
   };
 
   useEffect(() => {
-    console.log(document.cookie.token);
     const fetchData = async () => {
       try {
         const response = await axios.post(
-          "https://s50-musthafa-capstone-cosmos.onrender.com/users/tokenvalidate",
+          `${API_URL}/users/tokenvalidate`,
           {},
           { withCredentials: true }
         );
@@ -40,7 +40,7 @@ const useUserData = () => {
         setValid(valid);
       } catch (error) {
         Cookies.remove("token");
-        console.error("Error in post request", error.response.data);
+        console.error("Error in post request", error.response?.data ?? error.message);
         setError(error);
       } finally {
         setLoading(false);

@@ -3,6 +3,7 @@ const router = express.Router();
 const axios = require("axios");
 const mongoose = require("mongoose");
 const Apod = require("../Schemas/APOD");
+const config = require("../config/env");
 
 const news = [
   {
@@ -290,8 +291,7 @@ router.get("/getrandomnews", (req, res) => {
 
 // Astronomic picture of the day
 router.get("/apod", async (req, res) => {
-  const apiKey = "DEMO_KEY";
-  const apodUrl = `https://api.nasa.gov/planetary/apod?api_key=${apiKey}`;
+  const apodUrl = `https://api.nasa.gov/planetary/apod?api_key=${config.nasaApiKey}`;
   const todayDate = new Date().toISOString().split("T")[0];
   
   try {

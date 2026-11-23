@@ -1,11 +1,12 @@
 const { Server } = require("socket.io");
+const { clientOrigins } = require("./config/env");
 const CommunityMessage = require("./Schemas/Message");
 const PersonalMessage = require("./Schemas/PersonalMessage");
 
 const setupSocket = (server) => {
   const io = new Server(server, {
     cors: {
-      origin: "https://cosmos-plum.vercel.app",
+      origin: clientOrigins,
       methods: ["GET", "POST"],
     },
   });

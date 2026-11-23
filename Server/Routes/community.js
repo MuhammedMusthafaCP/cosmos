@@ -3,7 +3,6 @@ const router = express.Router();
 const communitymodel = require("../Schemas/Community");
 const app = express();
 app.use(express.json());
-require("dotenv").config();
 const multer = require("multer");
 const profile = require("../Schemas/Profile");
 const Message = require("../Schemas/Message");

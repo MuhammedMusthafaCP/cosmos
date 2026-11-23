@@ -1,3 +1,4 @@
+const config = require("./config/env");
 const cors = require("cors");
 const express = require("express");
 const passport = require("passport");
@@ -14,11 +15,8 @@ const chatrouter = require("./Routes/chat");
 const newsrouter = require("./Routes/news");
 const reviewrouter = require("./Routes/reviews");
 const cookieParser = require('cookie-parser')
-const port = 3000;
 const app = express();
-const SESSION_SECRET = process.env.SESSION_SECRET;
 connectDB();
-require("dotenv").config();
 require("./GoogleAuth/GoogleAuth");
 
 
@@ -28,7 +26,7 @@ app.use(cookieParser());
 
 app.use(
   session({
-    secret: SESSION_SECRET,
+    secret: config.sessionSecret,
     resave: false,
     saveUninitialized: true,
   })
@@ -39,7 +37,7 @@ app.use(passport.session());
 
 app.use(
   cors({
-    origin: "https://cosmos-plum.vercel.app",
+    origin: config.clientOrigins,
     credentials: true,
   })
 );
@@ -54,6 +52,6 @@ app.use("/chat", chatrouter);
 app.use("/news", newsrouter);
 app.use("/review", reviewrouter);
 
-server.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
+server.listen(config.port, () => {
+  console.log(`Server is running on port ${config.port} (${config.nodeEnv})`);
 });

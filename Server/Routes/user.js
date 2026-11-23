@@ -13,8 +13,8 @@ const postModel = require("../Schemas/Posts");
 const PersonalMessage = require("../Schemas/PersonalMessage");
 const saltRounds = 10;
 app.use(express.json());
-require("dotenv").config();
-const secretKey = process.env.JWT_SECRET;
+const config = require("../config/env");
+const secretKey = config.jwtSecret;
 
 // MIDDLE WARES
 
@@ -250,8 +250,7 @@ router.post("/", async (req, res) => {
         posts: [],
         bio: "",
         communities: [],
-        profilePic:
-          "https://firebasestorage.googleapis.com/v0/b/cosmos-16de1.appspot.com/o/dp%2FScreenshot%202024-06-27%20011730.png?alt=media&token=46546fec-441e-4fe6-835a-5a39bda65c8a",
+        profilePic: config.defaultProfilePicUrl,
         user_id: user._id,
       };
 
