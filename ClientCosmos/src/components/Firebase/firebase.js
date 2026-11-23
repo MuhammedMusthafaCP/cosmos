@@ -1,21 +1,22 @@
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import { getStorage } from "firebase/storage"
-import firebasevariables from "../../../env"
+
+const env = import.meta.env;
 
 const firebaseConfig = {
-  apiKey: firebasevariables.apiKey,
-  authDomain: firebasevariables.authDomain,
-  projectId: firebasevariables.projectId,
-  storageBucket: firebasevariables.storageBucket,
-  messagingSenderId: firebasevariables.messagingSenderId,
-  appId: firebasevariables.appId,
-  measurementId: firebasevariables.measurementId
+  apiKey: env.VITE_FIREBASE_API_KEY,
+  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: env.VITE_FIREBASE_APP_ID,
+  measurementId: env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const imDB = getStorage(app)
-const analytics = getAnalytics(app);
+getAnalytics(app);
 
 export {imDB};
