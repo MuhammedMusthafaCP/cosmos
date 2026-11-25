@@ -1,0 +1,35 @@
+services:
+  mongo:
+    image: mongo:7
+    volumes:
+      - mongo-data:/data/db
+
+  server:
+    build: ./Server
+    depends_on:
+      - mongo
+    ports:
+      - "4002:3000"
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/cosmos
+      JWT_SECRET: dev-jwt-secret-change-me
+      SESSION_SECRET: dev-session-secret-change-me
+      CLIENT_ORIGIN: http://localhost:5173
+      SERVER_URL: http://localhost:4002
+      # Placeholders: the server refuses to boot without them. Real Google login needs real
+      # credentials and http://localhost:4002/auth/google/callback registered in Google Cloud.
+      GOOGLE_CLIENT_ID: placeholder-client-id
+      GOOGLE_CLIENT_SECRET: placeholder-secret
+
+  client:
+    build:
+      context: ./ClientCosmos
+      args:
+        VITE_API_URL: http://localhost:4002
+    depends_on:
+      - server
+    ports:
+      - "5173:80"
+
+volumes:
+  mongo-data:
