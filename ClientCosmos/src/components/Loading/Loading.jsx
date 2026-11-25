@@ -1,12 +1,10 @@
-import React from "react";
-import { tailspin } from "ldrs";
+import { Loader2 } from "lucide-react";
 
 function Loading() {
-  tailspin.register();
-
   return (
-    <div>
-      <l-tailspin size="40" stroke="5" speed="0.9" color="black"></l-tailspin>
+    <div className="grid min-h-screen place-items-center bg-black text-white" role="status">
+      <Loader2 className="h-10 w-10 animate-spin" aria-hidden="true" />
+      <span className="sr-only">Loading</span>
     </div>
   );
 }

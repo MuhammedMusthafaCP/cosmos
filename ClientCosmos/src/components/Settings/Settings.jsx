@@ -1,37 +1,50 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Cookies from "js-cookie";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import HelpIcon from "../../Assets/helpIcon.png";
-import PassIcon from "../../Assets/passIcon.png";
-import AccountIcon from "../../Assets/accountIcon.png";
-import HomeIcon from "../../Assets/homeIcon.png";
-import editicon from "../../Assets/editicon.png";
+import { HelpCircle, Pencil, UserCircle, X } from "lucide-react";
 import useUserData from "../utils/UserData";
+import { API_URL } from "../../config";
+import SiteLayout from "../layout/SiteLayout";
+import ConfirmDialog from "../ui/ConfirmDialog";
+import Sheet from "../Chats/Sheet";
+import PageHeader from "../ui/PageHeader";
 
 function Help() {
   return (
-    <div className="p-4">
-      <h1 className="text-4xl font-bold mb-4">COSMOS Help Center</h1>
-      <p className="mb-6 text-lg">
+    <section className="d-card p-6">
+      <h2 className="text-2xl font-bold">COSMOS Help Center</h2>
+      <p className="mt-3 text-gray-300">
         Welcome to the COSMOS Help Center. Explore space-related topics, chat
-        through communities, and share pictures you've taken. For any assistance
+        through communities, and share pictures you&apos;ve taken. For any assistance
         or inquiries, please reach out to us.
       </p>
 
-      <h2 className="text-2xl font-semibold mb-4">Contact Information</h2>
-      <ul className="space-y-2">
-        <li>
-          <h2 className="text-lg font-semibold">CREATOR</h2>
-          <h2>MUHAMMED MUSTHAFA CP</h2>
-        </li>
-        <li>
-          <h2 className="text-lg font-semibold">EMAIL</h2>
-          <a href="mailto:musthafacp0007@gmail.com" className="text-blue-600">
-            musthafacp0007@gmail.com
-          </a>
-        </li>
-      </ul>
+      <h3 className="mt-6 text-lg font-semibold">Contact information</h3>
+      <dl className="mt-3 space-y-3 text-sm">
+        <div>
+          <dt className="font-semibold text-gray-500">CREATOR</dt>
+          <dd>MUHAMMED MUSTHAFA CP</dd>
+        </div>
+        <div>
+          <dt className="font-semibold text-gray-500">EMAIL</dt>
+          <dd>
+            <a href="mailto:musthafacp0007@gmail.com" className="text-sky-300 hover:text-sky-200">
+              musthafacp0007@gmail.com
+            </a>
+          </dd>
+        </div>
+      </dl>
+    </section>
+  );
+}
+
+function Banner({ kind, children }) {
+  const style =
+    kind === "error" ? "bg-red-500/10 text-red-300 border-red-500/30" : "bg-emerald-500/10 text-emerald-300 border-emerald-500/30";
+  return (
+    <div role={kind === "error" ? "alert" : "status"} className={`mb-4 rounded-lg border px-4 py-2.5 text-sm font-medium ${style}`}>
+      {children}
     </div>
   );
 }
@@ -42,163 +55,150 @@ function Account({ userData, setDeleteAccountPopUp, GoogleAuth }) {
   const [newPassword, setNewPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [fieldError, setFieldError] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  const handleChangePassword = async () => {
-    if (currentPassword !== "" && newPassword !== "") {
-      try {
-        const response = await axios.post(
-          `https://s50-musthafa-capstone-cosmos.onrender.com/users/changepassword/${userData.user_id}`,
-          {
-            currentPassword,
-            newPassword,
-          }
-        );
+  const resetForm = () => {
+    setIsEditing(false);
+    setCurrentPassword("");
+    setNewPassword("");
+    setFieldError("");
+  };
 
-        console.log(response.data);
-        if (response.data.success) {
-          setErrorMessage("");
-          setSuccessMessage("Password changed successfully");
-          setIsEditing(false);
-          setCurrentPassword("");
-          setNewPassword("");
-          setTimeout(() => {
-            setSuccessMessage("");
-          }, 4000);
-        } else {
-          console.log(response.data);
-          setErrorMessage("Current password is incorrect");
-          setIsEditing(false);
-          setCurrentPassword("");
-          setNewPassword("");
-          setTimeout(() => {
-            setErrorMessage("");
-          }, 4000);
-        }
-      } catch (error) {
-        console.log("Error while changing the password", error);
-        setErrorMessage("An error occurred while changing the password.");
-        setTimeout(() => {
-          setErrorMessage("");
-        }, 4000);
+  const flash = (setter, text) => {
+    setter(text);
+    setTimeout(() => setter(""), 4000);
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (currentPassword === "" || newPassword === "") {
+      setFieldError("Please fill in both password fields.");
+      return;
+    }
+    if (currentPassword === newPassword) {
+      setFieldError("The new password must be different from the current one.");
+      return;
+    }
+    setFieldError("");
+    setSaving(true);
+    try {
+      const response = await axios.post(
+        `${API_URL}/users/changepassword/${userData.user_id}`,
+        { currentPassword, newPassword }
+      );
+      if (response.data.success) {
+        setErrorMessage("");
+        flash(setSuccessMessage, "Password changed successfully");
+      } else {
+        flash(setErrorMessage, "Current password is incorrect");
       }
+      resetForm();
+    } catch (error) {
+      console.log("Error while changing the password", error);
+      flash(setErrorMessage, "An error occurred while changing the password.");
+    } finally {
+      setSaving(false);
     }
   };
 
-  return (
-    <div className="p-4">
-      <h2 className="text-3xl font-bold mb-4">Account Details</h2>
-      {userData ? (
-        <div className="p-4">
-          <div>
-            <h2 className="text-lg font-semibold font-poppins">Name</h2>
-            <input
-              type="text"
-              className="w-2/4 bg-white outline-none border rounded-sm py-2 px-3"
-              value={userData.name}
-              disabled
-            />
-          </div>
-          <div className="mt-5">
-            <h2 className="text-lg font-semibold font-poppins">Email</h2>
-            <input
-              type="text"
-              className="w-2/4 bg-white outline-none border rounded-sm py-2 px-3"
-              value={userData.email}
-              disabled
-            />
-          </div>
-          <hr className="w-full mt-10" />
+  if (!userData) {
+    return <p className="text-sm text-gray-400">Loading...</p>;
+  }
 
-          {GoogleAuth && (
-            <>
-              <div className="mt-6">
-                <div className="flex items-center gap-4 mb-4">
-                  <h2 className="text-2xl font-bold">Change Password</h2>
-                  <img
-                    className="w-4 h-4 cursor-pointer"
-                    src={editicon}
-                    alt="Edit Icon"
-                    onClick={() => setIsEditing(!isEditing)}
-                  />
-                </div>
-                <div>
-                  {errorMessage && (
-                    <div className="bg-red-600 w-full py-3 text-center text-white font-semibold mb-4">
-                      {errorMessage}
-                    </div>
-                  )}
-                  {successMessage && (
-                    <div className="bg-green-600 w-full py-3 text-center text-white font-semibold mb-4">
-                      {successMessage}
-                    </div>
-                  )}
-                </div>
-                <form action="">
-                  <div className="flex gap-3">
-                    <div className="w-2/4">
-                      <h2 className="text-lg text-gray-400 font-poppins">
-                        Current Password
-                      </h2>
-                      <input
-                        type="password"
-                        placeholder="........"
-                        required
-                        className={`bg-white w-full outline-none py-2 px-3 border ${
-                          isEditing ? "border-2 border-black" : ""
-                        }`}
-                        value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
-                        disabled={!isEditing}
-                      />
-                    </div>
-                    <div className="w-2/4">
-                      <h2 className="text-lg text-gray-400 font-poppins">
-                        New Password
-                      </h2>
-                      <input
-                        type="password"
-                        placeholder="........"
-                        className={`bg-white w-full outline-none py-2 px-3 border ${
-                          isEditing ? "border-2 border-black" : ""
-                        }`}
-                        required
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        disabled={!isEditing}
-                      />
-                    </div>
-                  </div>
-                </form>
-                {isEditing && (
-                  <div className="mt-4">
-                    <button
-                      onClick={handleChangePassword}
-                      className="px-5 py-2 bg-blue-600 text-white"
-                    >
-                      Save
-                    </button>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
+  return (
+    <div className="space-y-6">
+      <section className="d-card p-6">
+        <h2 className="text-xl font-bold">Account details</h2>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div>
-            <button
-              onClick={() => {
-                setDeleteAccountPopUp(true);
-              }}
-              className="px-5 py-2 bg-red-600 mt-6 text-white"
-            >
-              Delete Account
-            </button>
+            <label htmlFor="acc-name" className="mb-1 block text-sm font-medium text-gray-400">Name</label>
+            <input id="acc-name" type="text" className="d-input" value={userData.name || ""} disabled readOnly />
+          </div>
+          <div>
+            <label htmlFor="acc-email" className="mb-1 block text-sm font-medium text-gray-400">Email</label>
+            <input id="acc-email" type="text" className="d-input" value={userData.email || ""} disabled readOnly />
           </div>
         </div>
-      ) : (
-        <div>Loading...</div>
+      </section>
+
+      {GoogleAuth && (
+        <section className="d-card p-6">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-xl font-bold">Change password</h2>
+            <button
+              type="button"
+              onClick={() => (isEditing ? resetForm() : setIsEditing(true))}
+              title={isEditing ? "Cancel editing" : "Edit password"}
+              aria-label={isEditing ? "Cancel editing password" : "Edit password"}
+              className="d-btn h-9 w-9 !p-0"
+            >
+              {isEditing ? <X className="h-4 w-4" aria-hidden="true" /> : <Pencil className="h-4 w-4" aria-hidden="true" />}
+            </button>
+          </div>
+          <div className="mt-4">
+            {errorMessage && <Banner kind="error">{errorMessage}</Banner>}
+            {successMessage && <Banner kind="success">{successMessage}</Banner>}
+          </div>
+          <form onSubmit={handleChangePassword} noValidate>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="cur-pass" className="mb-1 block text-sm font-medium text-gray-400">Current password</label>
+                <input
+                  id="cur-pass"
+                  type="password"
+                  autoComplete="current-password"
+                  className="d-input"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  disabled={!isEditing}
+                />
+              </div>
+              <div>
+                <label htmlFor="new-pass" className="mb-1 block text-sm font-medium text-gray-400">New password</label>
+                <input
+                  id="new-pass"
+                  type="password"
+                  autoComplete="new-password"
+                  className="d-input"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  disabled={!isEditing}
+                />
+              </div>
+            </div>
+            {fieldError && <p role="alert" className="mt-2 text-xs text-red-400">{fieldError}</p>}
+            {isEditing && (
+              <div className="mt-4 flex gap-2">
+                <button type="submit" disabled={saving} className="d-btn-primary">
+                  {saving ? "Saving..." : "Save"}
+                </button>
+                <button type="button" onClick={resetForm} className="d-btn">
+                  Cancel
+                </button>
+              </div>
+            )}
+          </form>
+        </section>
       )}
+
+      <section className="d-card !border-red-500/30 p-6">
+        <h2 className="text-xl font-bold text-red-300">Delete account</h2>
+        <p className="mt-2 text-sm text-gray-400">
+          Permanently remove your account and its data. This cannot be undone.
+        </p>
+        <button type="button" onClick={() => setDeleteAccountPopUp(true)} className="mt-4 inline-flex items-center rounded-full bg-red-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-red-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400">
+          Delete account
+        </button>
+      </section>
     </div>
   );
 }
+
+const TABS = [
+  { key: "Account", label: "Account", Icon: UserCircle },
+  { key: "Help", label: "Help", Icon: HelpCircle },
+];
 
 function Settings() {
   const navigate = useNavigate();
@@ -208,15 +208,12 @@ function Settings() {
   const [password, setPassWord] = useState("");
   const [GoogleAuth, setGoogleAuth] = useState(true);
   const [passwordInvalid, setPasswordInvalid] = useState("");
-  const { userData } = useUserData();
+  const [deleting, setDeleting] = useState(false);
+  const { userData, valid, loading } = useUserData();
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
-
-  const navigateProfile = () => {
-    navigate("/profile");
-  };
 
   useEffect(() => {
     const googleAuth = Cookies.get("passwordisthere");
@@ -226,22 +223,26 @@ function Settings() {
   }, []);
 
   const DeleteAccount = async () => {
+    setDeleting(true);
     try {
-      const response = await axios.delete(
-        `https://s50-musthafa-capstone-cosmos.onrender.com/users/deleteMyAccount/${userData._id}`
-      );
+      await axios.delete(`${API_URL}/users/deleteMyAccount/${userData._id}`);
       Cookies.remove("token");
       Cookies.remove("passwordisthere");
       navigate("/HomePage");
       setDeleteAccountPopUp(false);
     } catch (err) {
       console.log("Error while deleting the Account", err);
+      setPasswordInvalid("Could not delete the account. Please try again.");
+    } finally {
+      setDeleting(false);
     }
   };
 
   const handleCancel = () => {
     setAskPassWord(false);
     setDeleteAccountPopUp(false);
+    setPassWord("");
+    setPasswordInvalid("");
   };
 
   const AskPassword = () => {
@@ -252,155 +253,112 @@ function Settings() {
     }
   };
 
-  const CheckPassWord = async () => {
+  const CheckPassWord = async (e) => {
+    if (e) e.preventDefault();
+    if (password === "") {
+      setPasswordInvalid("Please enter your password.");
+      return;
+    }
     try {
       const response = await axios.post(
-        `https://s50-musthafa-capstone-cosmos.onrender.com/users/checkPassword/${userData.user_id}`,
+        `${API_URL}/users/checkPassword/${userData.user_id}`,
         { password }
       );
-      if (response.data.message == "Password is correct") {
+      if (response.data.message === "Password is correct") {
         DeleteAccount();
       } else {
         setPasswordInvalid(response.data.message);
       }
     } catch (err) {
       console.log("Error while checking Password", err);
+      setPasswordInvalid("Could not verify your password. Please try again.");
     }
   };
 
   return (
-    <>
-      {!userData && (
-        <div>
-          <div className="overlay"></div>
-          <div className="border logout-popup p-5 py-8 rounded flex flex-col justify-around text-center">
-            <h2 className="text-xl mb-5 font-poppins">
-              You have to login to see your account details !
-            </h2>
-            <div className="flex mt-3 justify-evenly">
-              <button
-                className="py-2 px-5  bg-black text-white  tracking-wider "
-                onClick={() => navigate("/login")}
-              >
-                Login
-              </button>
-              <button
-                className="py-2 px-5  border  text-black  hover:bg-gray-50"
-                onClick={() => navigate("/HomePage")}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {DeleteAccountPopUp && (
-        <div>
-          <div className="overlay"></div>
-          <div className="border logout-popup p-10 rounded flex flex-col justify-around text-center">
-            <h2 className="text-xl mb-3 font-poppins">
-              Are you sure you want to delete this account ?
-            </h2>
-            {passwordInvalid.length != 0 && (
-              <div className="bg-red-500 rounded-sm py-2 px-3 mb-4 text-white w-full">
-                {passwordInvalid}
-              </div>
-            )}
-            {askPassWord ? (
-              <div>
-                <input
-                  type="text"
-                  className="bg-white px-3 py-2 w-full outline-none border font-light"
-                  placeholder="Please enter your password"
-                  value={password}
-                  onChange={(e) => {
-                    setPassWord(e.target.value);
-                  }}
-                />
-                <div className="mt-4 flex gap-4 justify-center">
-                  <button
-                    className="px-4 py-2 bg-black text-white"
-                    onClick={() => CheckPassWord()}
-                  >
-                    Submit
-                  </button>
-                  <button className="px-4 py-2 border" onClick={handleCancel}>
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex justify-evenly">
-                <button
-                  className="px-4 py-2 bg-black text-white"
-                  onClick={() => AskPassword()}
-                >
-                  Delete
-                </button>
-                <button className="px-4 py-2 border" onClick={handleCancel}>
-                  Cancel
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+    <SiteLayout valid={valid} userData={userData}>
+      <PageHeader eyebrow="Account" title="Settings" description="Manage your account details, password and get help." />
 
-      <div className="h-screen w-screen px-10 py-10">
-        <nav className="flex px-10 items-center bg-gray-200 justify-between py-3">
-          <h2 className="text-4xl font font-bold tracking-widest">SETTINGS</h2>
-          <div className="flex items-center gap-20">
-            <div className="flex items-center gap-3 justify-between cursor-pointer bg-gray-300 px-3 py-2 rounded-xl">
-              <div onClick={navigateProfile} className="rounded">
-                <img
-                  className="rounded-lg h-8"
-                  src={userData?.profilePic}
-                  alt="Profile"
-                />
-              </div>
-              <div className="font-poppins text-sm">{userData?.name}</div>
-            </div>
-          </div>
+      <div className="mt-8 flex flex-col gap-6 md:flex-row">
+        <nav aria-label="Settings sections" className="flex shrink-0 gap-2 md:w-56 md:flex-col">
+          {TABS.map(({ key, label, Icon }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setSelectedFun(key)}
+              aria-current={selectedFun === key ? "page" : undefined}
+              className={`flex flex-1 items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 md:flex-none ${
+                selectedFun === key
+                  ? "bg-white text-black"
+                  : "border border-white/10 text-gray-300 hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              <Icon className="h-4 w-4" aria-hidden="true" />
+              {label}
+            </button>
+          ))}
         </nav>
-        <div className="flex h-[70vh]">
-          <div className="flex flex-col gap-2 w-64 px-2 border-r-2 mt-10">
-            <button
-              onClick={() => {
-                navigate("/HomePage");
-              }}
-              className="w-full py-2 px-3 border rounded-sm hover:bg-gray-200 flex gap-2 items-center cursor-pointer"
-            >
-              <img className="w-4" src={HomeIcon} alt="Home" />
-              <h2>HOME</h2>
-            </button>
-            <button
-              onClick={() => setSelectedFun("Account")}
-              className="w-full py-2 px-3 border rounded-sm hover:bg-gray-200 flex gap-2 items-center cursor-pointer"
-            >
-              <img className="w-4" src={AccountIcon} alt="Account" />
-              <h2>ACCOUNT</h2>
-            </button>
-            <button
-              onClick={() => setSelectedFun("Help")}
-              className="w-full py-2 px-3 border rounded-sm hover:bg-gray-200 flex gap-2 items-center cursor-pointer"
-            >
-              <img className="w-4" src={HelpIcon} alt="Help" />
-              <h2>HELP</h2>
-            </button>
-          </div>
-          <div className="w-full h-full mt-10">
-            {selectedFun === "Account" && (
-              <Account
-                setDeleteAccountPopUp={setDeleteAccountPopUp}
-                userData={userData}
-                GoogleAuth={GoogleAuth}
-              />
-            )}
-            {selectedFun === "Help" && <Help />}
-          </div>
+
+        <div className="min-w-0 flex-1">
+          {selectedFun === "Account" && (
+            <Account
+              setDeleteAccountPopUp={setDeleteAccountPopUp}
+              userData={userData}
+              GoogleAuth={GoogleAuth}
+            />
+          )}
+          {selectedFun === "Help" && <Help />}
         </div>
       </div>
-    </>
+
+      <ConfirmDialog
+        open={!loading && !valid}
+        title="Please log in to continue"
+        message="You have to log in to see your account details."
+        confirmLabel="Login"
+        cancelLabel="Cancel"
+        onConfirm={() => navigate("/login")}
+        onCancel={() => navigate("/HomePage")}
+      />
+
+      <ConfirmDialog
+        open={DeleteAccountPopUp && !askPassWord}
+        danger
+        title="Delete this account?"
+        message="This action cannot be undone."
+        confirmLabel={deleting ? "Deleting..." : "Delete"}
+        onConfirm={AskPassword}
+        onCancel={handleCancel}
+      />
+
+      <Sheet open={DeleteAccountPopUp && askPassWord} title="Confirm your password" onClose={handleCancel}>
+        <form onSubmit={CheckPassWord} noValidate className="space-y-4">
+          <p className="text-sm text-gray-400">Enter your password to permanently delete your account.</p>
+          <div>
+            <label htmlFor="del-pass" className="mb-1 block text-sm font-medium text-gray-400">Password</label>
+            <input
+              id="del-pass"
+              type="password"
+              autoComplete="current-password"
+              autoFocus
+              className="d-input"
+              value={password}
+              onChange={(e) => {
+                setPassWord(e.target.value);
+                setPasswordInvalid("");
+              }}
+            />
+            {passwordInvalid && <p role="alert" className="mt-1 text-xs text-red-400">{passwordInvalid}</p>}
+          </div>
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={handleCancel} className="d-btn">Cancel</button>
+            <button type="submit" disabled={deleting} className="inline-flex items-center rounded-full bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-500">
+              {deleting ? "Deleting..." : "Delete account"}
+            </button>
+          </div>
+        </form>
+      </Sheet>
+    </SiteLayout>
   );
 }
 

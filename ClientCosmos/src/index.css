@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  /* Shared UI primitives for the dark pages (daisyUI owns `.btn`, so these use the `d-` prefix). */
+  .d-card { @apply rounded-2xl border border-white/10 bg-white/[0.03] text-white transition; }
+  .d-card-hover { @apply hover:-translate-y-1 hover:border-white/25 hover:bg-white/[0.06]; }
+  .d-input {
+    @apply block w-full rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-sm text-white placeholder-gray-500 transition focus:border-sky-400/60 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-sky-400/20 disabled:opacity-50;
+  }
+  .d-btn { @apply inline-flex items-center justify-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-50; }
+  .d-btn-primary { @apply inline-flex items-center justify-center gap-2 rounded-full bg-white px-5 py-2 text-sm font-semibold text-black transition hover:bg-sky-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-50; }
+  .d-btn-danger { @apply inline-flex items-center justify-center gap-2 rounded-full border border-red-500/40 bg-red-500/10 px-5 py-2 text-sm font-semibold text-red-300 transition hover:bg-red-500/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400 disabled:cursor-not-allowed disabled:opacity-50; }
+}
+
 .font-poppins {
   font-family: "Poppins", sans-serif;
 }
@@ -9,46 +21,6 @@
 :root {
   background-color: white;
   color: black;
-}
-
-.ui-bookmark {
-  --icon-size: 24px;
-  --icon-secondary-color: rgb(77, 77, 77);
-  --icon-hover-color: rgb(97, 97, 97);
-  --icon-primary-color: rgb(252, 54, 54);
-  --icon-circle-border: 1px solid var(--icon-primary-color);
-  --icon-circle-size: 35px;
-  --icon-anmt-duration: 0.3s;
-}
-
-.ui-bookmark input {
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-  display: none;
-}
-
-.ui-bookmark .bookmark {
-  width: var(--icon-size);
-  height: auto;
-  fill: var(--icon-secondary-color);
-  cursor: pointer;
-  -webkit-transition: 0.2s;
-  -o-transition: 0.2s;
-  transition: 0.2s;
-  display: -webkit-box;
-  display: -ms-flexbox;
-  display: flex;
-  -webkit-box-pack: center;
-  -ms-flex-pack: center;
-  justify-content: center;
-  -webkit-box-align: center;
-  -ms-flex-align: center;
-  align-items: center;
-  position: relative;
-  -webkit-transform-origin: top;
-  -ms-transform-origin: top;
-  transform-origin: top;
 }
 
 .bookmark::after {
@@ -85,39 +57,6 @@
   border-radius: 50%;
   border: var(--icon-circle-border);
   opacity: 0;
-}
-
-/* actions */
-
-.ui-bookmark:hover .bookmark {
-  fill: var(--icon-hover-color);
-}
-
-.ui-bookmark input:checked + .bookmark::after {
-  -webkit-animation: circles var(--icon-anmt-duration)
-    cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-  animation: circles var(--icon-anmt-duration)
-    cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-  -webkit-animation-delay: var(--icon-anmt-duration);
-  animation-delay: var(--icon-anmt-duration);
-}
-
-.ui-bookmark input:checked + .bookmark {
-  fill: var(--icon-primary-color);
-  -webkit-animation: bookmark var(--icon-anmt-duration) forwards;
-  animation: bookmark var(--icon-anmt-duration) forwards;
-  -webkit-transition-delay: 0.3s;
-  -o-transition-delay: 0.3s;
-  transition-delay: 0.3s;
-}
-
-.ui-bookmark input:checked + .bookmark::before {
-  -webkit-animation: circle var(--icon-anmt-duration)
-    cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-  animation: circle var(--icon-anmt-duration)
-    cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-  -webkit-animation-delay: var(--icon-anmt-duration);
-  animation-delay: var(--icon-anmt-duration);
 }
 
 @-webkit-keyframes bookmark {
@@ -227,28 +166,6 @@
   fill: var(--color);
 }
 
-.container .save-regular {
-  position: absolute;
-  animation: keyframes-fill 0.5s;
-  transform-origin: top;
-}
-
-.container .save-solid {
-  position: absolute;
-  animation: keyframes-fill 0.5s;
-  display: none;
-  transform-origin: top;
-}
-
-/* ------ On check event ------ */
-.container input:checked ~ .save-regular {
-  display: none;
-}
-
-.container input:checked ~ .save-solid {
-  display: block;
-}
-
 /* ------ Hide the default checkbox ------ */
 .container input {
   position: absolute;
@@ -259,97 +176,6 @@
 }
 
 /* ------ Animation ------ */
-@keyframes keyframes-fill {
-  0% {
-    transform: scale(0);
-    opacity: 0;
-  }
-
-  50% {
-    transform: scaleY(1.2);
-  }
-}
-
-/* SAVE  */
-
-.custom-container {
-  --icon-size: 24px;
-  --icon-secondary-color: rgb(77, 77, 77);
-  --icon-hover-color: rgb(97, 97, 97);
-  --icon-primary-color: gold;
-  --icon-circle-border: 1px solid var(--icon-primary-color);
-  --icon-circle-size: 35px;
-  --icon-anmt-duration: 0.3s;
-}
-
-.custom-container input {
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-  display: none;
-}
-
-.custom-container .custom-bookmark {
-  width: var(--icon-size);
-  height: auto;
-  fill: var(--icon-secondary-color);
-  cursor: pointer;
-  transition: 0.2s;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  position: relative;
-  transform-origin: top;
-}
-
-.custom-bookmark::after {
-  content: "";
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  box-shadow: 0 30px 0 -4px var(--icon-primary-color),
-    30px 0 0 -4px var(--icon-primary-color),
-    0 -30px 0 -4px var(--icon-primary-color),
-    -30px 0 0 -4px var(--icon-primary-color),
-    -22px 22px 0 -4px var(--icon-primary-color),
-    -22px -22px 0 -4px var(--icon-primary-color),
-    22px -22px 0 -4px var(--icon-primary-color),
-    22px 22px 0 -4px var(--icon-primary-color);
-  border-radius: 50%;
-  transform: scale(0);
-}
-
-.custom-bookmark::before {
-  content: "";
-  position: absolute;
-  border-radius: 50%;
-  border: var(--icon-circle-border);
-  opacity: 0;
-}
-
-/* actions */
-
-.custom-container:hover .custom-bookmark {
-  fill: var(--icon-hover-color);
-}
-
-.custom-container input:checked + .custom-bookmark::after {
-  animation: circles var(--icon-anmt-duration)
-    cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-  animation-delay: var(--icon-anmt-duration);
-}
-
-.custom-container input:checked + .custom-bookmark {
-  fill: var(--icon-primary-color);
-  animation: bookmark var(--icon-anmt-duration) forwards;
-  transition-delay: 0.3s;
-}
-
-.custom-container input:checked + .custom-bookmark::before {
-  animation: circle var(--icon-anmt-duration)
-    cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-  animation-delay: var(--icon-anmt-duration);
-}
 
 @keyframes bookmark {
   50% {
@@ -387,28 +213,6 @@
     transform: scale(0.8);
     opacity: 0;
   }
-}
-
-.slide-in {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100vh;
-  background-color: rgb(31, 31, 31);
-  transform-origin: bottom;
-  color: white;
-}
-
-.slide-out {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100vh;
-  background-color: rgb(31, 31, 31);
-  color: white;
-  transform-origin: top;
 }
 
 /* LOADING  */
@@ -457,21 +261,8 @@
   }
 }
 
-/* POSTFORM */
-
-.modalBox::-webkit-scrollbar {
-  width: 0;
-}
-
 .myPosts::-webkit-scrollbar {
   width: 0;
-}
-
-/* LOADING  */
-
-.banter-loader {
-  width: 72px;
-  height: 72px;
 }
 
 .banter-loader__box {
@@ -960,65 +751,8 @@
   animation: moveBox-9 4s infinite;
 }
 
-/* INPUT BOX */
-
-.fileUploadWrapper {
-  width: fit-content;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: Arial, Helvetica, sans-serif;
-}
-
 #file {
   display: none;
-}
-
-.fileUploadWrapper label {
-  cursor: pointer;
-  width: fit-content;
-  height: fit-content;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-.fileUploadWrapper label svg {
-  height: 18px;
-}
-.fileUploadWrapper label svg path {
-  transition: all 0.3s;
-}
-.fileUploadWrapper label svg circle {
-  transition: all 0.3s;
-}
-.fileUploadWrapper label:hover svg path {
-  stroke: #fff;
-}
-.fileUploadWrapper label:hover svg circle {
-  stroke: #fff;
-  fill: #3c3c3c;
-}
-.fileUploadWrapper label:hover .tooltip {
-  display: block;
-  opacity: 1;
-}
-
-.tooltip {
-  position: absolute;
-  top: -40px;
-  display: none;
-  opacity: 0;
-  color: white;
-  font-size: 10px;
-  text-wrap: nowrap;
-  background-color: #000;
-  padding: 6px 10px;
-  border: 1px solid #3c3c3c;
-  border-radius: 5px;
-  box-shadow: 0px 5px 10px rgba(0, 0, 0, 0.596);
-  transition: all 0.3s;
 }
 
 #sendButton svg {
@@ -1041,24 +775,4 @@
   backdrop-filter: blur(1px);
   z-index: 999;
   pointer-events: none;
-}
-
-.logout-popup {
-  background-color: white;
-  width: 30%;
-  position: fixed;
-  top: 50%; 
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 9999;
-}
-
-/* // <uniquifier>: Use a unique and descriptive class name */
-
-.quicksand-font {
-  font-family: "Quicksand", sans-serif;
-  font-optical-sizing: auto;
-  font-weight: 100;
-  letter-spacing: 1px;
-  font-style: normal;
 }

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import Landingpage from "./components/Landingpage";
 import HomePage from "./components/HomePage";
@@ -21,6 +21,8 @@ import Settings from "./components/Settings/Settings";
 import UserProfile from "./components/UserProfile/UserProfile";
 import Chats from "./components/Chats/Chats";
 import CommunityChats from "./components/Chats/CommunityChats";
+import NotFound from "./components/NotFound";
+import { Contact, Privacy, Terms } from "./components/InfoPages";
 function App() {
   const location = useLocation();
   const [selectedNews, setSelectedNews] = useState(null);
@@ -49,16 +51,17 @@ function App() {
           element={<News setSelectedNews={setSelectedNews} />}
         />
         <Route path="/about" element={<About />} />
+        <Route path="/contact" element={<Contact />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
         <Route path="/Postform" element={<PostForm />} />
         <Route
-          path="/selenews"
+          path="/news/:id"
           element={
-            selectedNews && (
-              <SelectedNews
-                setSelectedNews={setSelectedNews}
-                selectedNews={selectedNews}
-              />
-            )
+            <SelectedNews
+              setSelectedNews={setSelectedNews}
+              selectedNews={selectedNews}
+            />
           }
         />
         <Route
@@ -81,9 +84,9 @@ function App() {
           path="/solarsystem"
           element={<SolarSystem setSelectedNews={setSelectedNews} />}
         />
-        <Route />
         <Route path="/loading" element={<Loading />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </>
   );

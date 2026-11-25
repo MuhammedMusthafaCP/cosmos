@@ -1,33 +1,24 @@
 import axios from "axios";
-import Cookies from "js-cookie";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import Swal from "sweetalert2";
-import React from "react";
+import { toast } from "react-toastify";
+import { Loader2 } from "lucide-react";
 import useUserData from "../utils/UserData";
+import { API_URL } from "../../config";
+import Modal from "../ui/Modal";
+import { TOPIC_OPTIONS } from "./topics";
 
 function PostEditForm({ EditModal, setEditModalOpen, mypostFetch, post }) {
-  const [iv, setisv] = useState(false);
   const { user } = useUserData();
-
-  useEffect(() => {
-    if (EditModal == true) {
-      document.getElementById("my_modal_3").showModal();
-      setisv(true);
-    } else {
-      if (iv) {
-        document.getElementById("my_modal_3").close();
-        setisv(false);
-      }
-    }
-  }, [EditModal]);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   const {
     register,
     handleSubmit,
     formState: { errors },
     setValue,
-  } = useForm();
+  } = useForm({ defaultValues: { caption: post?.caption ?? "", topic: post?.topic ?? "home" } });
 
   useEffect(() => {
     if (post) {
@@ -36,108 +27,77 @@ function PostEditForm({ EditModal, setEditModalOpen, mypostFetch, post }) {
     }
   }, [post, setValue]);
 
+  const close = () => {
+    if (!submitting) setEditModalOpen?.(false);
+  };
+
   const onSubmit = async (data) => {
+    setSubmitting(true);
+    setSubmitError("");
     try {
-      setEditModalOpen(false);
-      const response = await axios.put(
-        `https://s50-musthafa-capstone-cosmos.onrender.com/posts/${post._id}`,
-        data,
-        {
-          headers: {
-            "X-Profile": JSON.stringify(user),
-            "Content-Type": "application/json",
-          },
-        }
-      );
-      if (response) {
-        console.log(response);
-        Swal.fire({
-          title: "You updated the post successfully",
-        });
-      }
-      mypostFetch();
+      await axios.put(`${API_URL}/posts/${post._id}`, data, {
+        headers: {
+          "X-Profile": JSON.stringify(user),
+          "Content-Type": "application/json",
+        },
+      });
+      toast.success("Post updated successfully");
+      setEditModalOpen?.(false);
+      mypostFetch?.();
     } catch (error) {
       console.log(error);
+      setSubmitError("Could not update the post. Please try again.");
+      setSubmitting(false);
     }
   };
 
-  const closeModall = () => {
-    setEditModalOpen(false);
-  };
-
   return (
-    <>
-      <dialog id="my_modal_3" className="modal">
-        <div className="modal-box bg-white modalBox">
-          <form onSubmit={handleSubmit(onSubmit)}>
-            <button
-              type="button"
-              className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
-              onClick={() => closeModall()}
-            >
-              ✕
-            </button>
-
-            <h2 className="text-3xl tracking-widest font-bold">
-              UPDATE YOUR POST
-            </h2>
-
-            <div className="mt-5">
-              <label
-                htmlFor="caption"
-                className="block text-sm mb-2 text-black"
-              >
-                Caption
-              </label>
-              <input
-                type="text"
-                id="caption"
-                name="caption"
-                className="  py-3 px-4 block w-full border-gray-200 rounded-lg text-sm disabled:opacity-50 disabled:pointer-events-none bg-white border "
-                {...register("caption", {
-                  required: "caption is required",
-                })}
-              />
-              <p className="text-red-500 text-xs">
-                {errors.caption && (
-                  <span className="error-message">
-                    {errors.caption.message}
-                  </span>
-                )}
-              </p>
-            </div>
-
-            <div className="mt-3">
-              <label htmlFor="topic" className="block text-sm mb-2 text-black">
-                Topic
-              </label>
-              <select
-                id="topic"
-                name="topic"
-                className="py-3 px-4 block w-full border-gray-200 rounded-lg text-sm disabled:opacity-50 disabled:pointer-events-none bg-white border "
-                required
-                {...register("topic")}
-              >
-                <option value="home">EARTH</option>
-                <option value="solarsystem">SOLAR SYSTEM</option>
-                <option value="star">STARS</option>
-                <option value="galaxies">GALAXIES</option>
-                <option value="supernova">SUPER NOVA</option>
-                <option value="nebula">NEBULAS</option>
-                <option value="blackHole">BLACK HOLE</option>
-              </select>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full py-3 px-4 mt-8 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-black text-white hover:bg-gray-900 duration-300 disabled:opacity-50 disabled:pointer-events-none dark:focus:outline-none dark:focus:ring-1 dark:focus:ring-gray-600"
-            >
-              UPDATE POST
-            </button>
-          </form>
+    <Modal open={Boolean(EditModal)} onClose={close} title="Update your post">
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
+        <div>
+          <label htmlFor="edit-caption" className="mb-1 block text-sm font-medium text-gray-300">
+            Caption
+          </label>
+          <input
+            type="text"
+            id="edit-caption"
+            className="d-input"
+            aria-invalid={Boolean(errors.caption)}
+            aria-describedby={errors.caption ? "edit-caption-error" : undefined}
+            {...register("caption", { required: "Caption is required", validate: (v) => v.trim() !== "" || "Caption is required" })}
+          />
+          {errors.caption && (
+            <p id="edit-caption-error" role="alert" className="mt-1 text-xs text-red-400">
+              {errors.caption.message}
+            </p>
+          )}
         </div>
-      </dialog>
-    </>
+
+        <div>
+          <label htmlFor="edit-topic" className="mb-1 block text-sm font-medium text-gray-300">
+            Topic
+          </label>
+          <select id="edit-topic" className="d-input" {...register("topic")}>
+            {TOPIC_OPTIONS.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {submitError && (
+          <p role="alert" className="text-sm text-red-400">
+            {submitError}
+          </p>
+        )}
+
+        <button type="submit" disabled={submitting} className="d-btn-primary w-full !py-3">
+          {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+          {submitting ? "Saving..." : "Update post"}
+        </button>
+      </form>
+    </Modal>
   );
 }
 

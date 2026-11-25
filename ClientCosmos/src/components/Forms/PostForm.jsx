@@ -1,66 +1,76 @@
 import axios from "axios";
-import Cookies from "js-cookie";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import Swal from "sweetalert2";
-import React from "react";
-import ReactDOM from "react-dom";
-import { Pane, FileUploader, FileCard } from "evergreen-ui";
-import { imDB } from "../Firebase/firebase";
 import { v4 } from "uuid";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import { PulseLoader } from "react-spinners";
+import { ImagePlus, Loader2, X } from "lucide-react";
+import { imDB } from "../Firebase/firebase";
 import useUserData from "../utils/UserData";
+import { API_URL } from "../../config";
+import Modal from "../ui/Modal";
+import { TOPIC_OPTIONS } from "./topics";
 
-function PostForm({ Modal, setModalOpen, mypostFetch }) {
+const MAX_BYTES = 50 * 1024 ** 2;
+
+function PostForm({ Modal: isOpen, setModalOpen, mypostFetch }) {
   const { userData } = useUserData();
-
-  const [iv, setisv] = useState(false);
-  const [files, setFiles] = React.useState([]);
-  const [postLoading, setPostLoading] = useState(false);
-  const [fileRejections, setFileRejections] = React.useState([]);
-  const handleChange = React.useCallback((files) => setFiles([files[0]]), []);
-  const handleRejected = React.useCallback(
-    (fileRejections) => setFileRejections([fileRejections[0]]),
-    []
-  );
-  const handleRemove = React.useCallback(() => {
-    setFiles([]);
-    setFileRejections([]);
-  }, []);
-  useEffect(() => {
-    if (Modal == true) {
-      document.getElementById("my_modal_3").showModal();
-      setisv(true);
-    } else {
-      if (iv) {
-        document.getElementById("my_modal_3").close();
-        setisv(false);
-      }
-    }
-  }, [Modal]);
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState("");
+  const [fileError, setFileError] = useState("");
+  const [submitError, setSubmitError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm();
+
+  useEffect(() => {
+    if (!file) {
+      setPreview("");
+      return undefined;
+    }
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  const close = () => {
+    if (!submitting) setModalOpen?.(false);
+  };
+
+  const onFileChange = (e) => {
+    const picked = e.target.files?.[0];
+    e.target.value = "";
+    if (!picked) return;
+    if (!picked.type.startsWith("image/")) {
+      setFile(null);
+      setFileError("Please choose an image file.");
+    } else if (picked.size > MAX_BYTES) {
+      setFile(null);
+      setFileError("Image must be 50 MB or smaller.");
+    } else {
+      setFile(picked);
+      setFileError("");
+    }
+  };
+
   const onSubmit = async (data) => {
-    setPostLoading(true);
+    if (!file) {
+      setFileError("Please choose an image to upload.");
+      return;
+    }
+    setSubmitting(true);
+    setSubmitError("");
     try {
       const imgS = ref(imDB, `images${v4()}`);
-      const uploadData = await uploadBytes(imgS, files[0]);
+      const uploadData = await uploadBytes(imgS, file);
       const imageUrl = await getDownloadURL(uploadData.ref);
 
-      const requestData = {
-        ...data,
-        image: imageUrl,
-      };
-
-      setModalOpen(false);
-      const response = await axios.post(
-        "https://s50-musthafa-capstone-cosmos.onrender.com/posts/newpost",
-        requestData,
+      await axios.post(
+        `${API_URL}/posts/newpost`,
+        { ...data, image: imageUrl },
         {
           headers: {
             "X-Profile": JSON.stringify(userData),
@@ -68,135 +78,94 @@ function PostForm({ Modal, setModalOpen, mypostFetch }) {
           },
         }
       );
-      // Swal.fire({
-      //   title: "You created a post successfully",
-      // });
-      mypostFetch();
-      setPostLoading(false);
+      setModalOpen?.(false);
+      mypostFetch?.();
     } catch (error) {
       console.log(error);
+      setSubmitError("Something went wrong while creating your post. Please try again.");
+      setSubmitting(false);
     }
-  };
-  const closeModall = () => {
-    setModalOpen(false);
   };
 
   return (
-    <>
-      <dialog id="my_modal_3" className="modal">
-        <div className="modal-box bg-white modalBox">
-          <form onSubmit={handleSubmit(onSubmit)}>
-            <button
-              type="button"
-              className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
-              onClick={closeModall}
-            >
-              ✕
-            </button>
-
-            <h2 className="text-3xl tracking-widest font-bold">
-              CREATE A POST
-            </h2>
-
-            <div className="mt-5">
-              <label
-                htmlFor="caption"
-                className="block text-sm mb-2 text-black"
-              >
-                Caption
-              </label>
-              <input
-                type="text"
-                id="caption"
-                name="caption"
-                className="  py-3 px-4 block w-full border-gray-200 rounded-lg text-sm disabled:opacity-50 disabled:pointer-events-none bg-white border "
-                {...register("caption", {
-                  required: "caption is required",
-                })}
-              />
-              <p className="text-red-500 text-xs">
-                {errors.caption && (
-                  <span className="error-message">
-                    {errors.caption.message}
-                  </span>
-                )}
-              </p>
-            </div>
-
-            <div className="mt-3">
-              <Pane maxWidth={654}>
-                <FileUploader
-                  label="Upload File"
-                  description="You can upload 1 file. File can be up to 50 MB."
-                  maxSizeInBytes={50 * 1024 ** 2}
-                  maxFiles={1}
-                  onChange={handleChange}
-                  onRejected={handleRejected}
-                  renderFile={(file) => {
-                    const { name, size, type } = file;
-                    const fileRejection = fileRejections.find(
-                      (fileRejection) => fileRejection.file === file
-                    );
-                    const { message } = fileRejection || {};
-                    return (
-                      <FileCard
-                        key={name}
-                        isInvalid={fileRejection != null}
-                        name={name}
-                        onRemove={handleRemove}
-                        sizeInBytes={size}
-                        type={type}
-                        validationMessage={message}
-                      />
-                    );
-                  }}
-                  values={files}
-                />
-              </Pane>
-              <p className="text-red-500 text-xs">
-                {errors.image && (
-                  <span className="error-message">{errors.image.message}</span>
-                )}
-              </p>
-            </div>
-
-            <div className="mt-3">
-              <label htmlFor="topic" className="block text-sm mb-2 text-black">
-                Topic
-              </label>
-              <select
-                id="topic"
-                name="topic"
-                className="py-3 px-4 block w-full border-gray-200 rounded-lg text-sm disabled:opacity-50 disabled:pointer-events-none bg-white border "
-                required
-                {...register("topic")}
-              >
-                <option value="home">EARTH</option>
-                <option value="solarsystem">SOLAR SYSTEM</option>
-                <option value="star">STARS</option>
-                <option value="galaxies">GALAXIES</option>
-                <option value="supernova">SUPER NOVA</option>
-                <option value="nebula">NEBULAS</option>
-                <option value="blackHole">BLACK HOLE</option>
-              </select>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full py-0 px-4 mt-4 justify-center items-center text-sm font-semibold rounded-lg bg-black text-white hover:bg-gray-900 duration-300 "
-            >
-              {postLoading ? (
-                <div className="flex justify-center py-4">
-                  <PulseLoader color="#ffffff" size={11} />
-                </div>
-              ) : (
-                <h2>CREATE POST</h2>
-              )}
-            </button>
-          </form>
+    <Modal open={Boolean(isOpen)} onClose={close} title="Create a post">
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
+        <div>
+          <label htmlFor="caption" className="mb-1 block text-sm font-medium text-gray-300">
+            Caption
+          </label>
+          <input
+            type="text"
+            id="caption"
+            className="d-input"
+            aria-invalid={Boolean(errors.caption)}
+            aria-describedby={errors.caption ? "caption-error" : undefined}
+            {...register("caption", { required: "Caption is required", validate: (v) => v.trim() !== "" || "Caption is required" })}
+          />
+          {errors.caption && (
+            <p id="caption-error" role="alert" className="mt-1 text-xs text-red-400">
+              {errors.caption.message}
+            </p>
+          )}
         </div>
-      </dialog>
-    </>
+
+        <div>
+          <span className="mb-1 block text-sm font-medium text-gray-300">Image</span>
+          {preview ? (
+            <div className="relative overflow-hidden rounded-lg border border-white/10">
+              <img src={preview} alt="Selected upload preview" className="max-h-56 w-full object-cover" />
+              <button
+                type="button"
+                onClick={() => setFile(null)}
+                aria-label="Remove selected image"
+                className="absolute right-2 top-2 rounded-full bg-black/70 p-1.5 text-white hover:bg-black"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <label
+              htmlFor="post-image"
+              className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed border-white/20 px-4 py-8 text-center text-sm text-gray-300 transition hover:border-sky-400/60 hover:bg-white/5 focus-within:ring-2 focus-within:ring-sky-400"
+            >
+              <ImagePlus className="h-8 w-8" aria-hidden="true" />
+              <span className="font-medium">Choose an image</span>
+              <span className="text-xs text-gray-500">One image, up to 50 MB</span>
+            </label>
+          )}
+          <input id="post-image" type="file" accept="image/*" className="sr-only" onChange={onFileChange} />
+          {fileError && (
+            <p role="alert" className="mt-1 text-xs text-red-400">
+              {fileError}
+            </p>
+          )}
+        </div>
+
+        <div>
+          <label htmlFor="topic" className="mb-1 block text-sm font-medium text-gray-300">
+            Topic
+          </label>
+          <select id="topic" className="d-input" {...register("topic")}>
+            {TOPIC_OPTIONS.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {submitError && (
+          <p role="alert" className="text-sm text-red-400">
+            {submitError}
+          </p>
+        )}
+
+        <button type="submit" disabled={submitting} className="d-btn-primary w-full !py-3">
+          {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+          {submitting ? "Posting..." : "Create post"}
+        </button>
+      </form>
+    </Modal>
   );
 }
 

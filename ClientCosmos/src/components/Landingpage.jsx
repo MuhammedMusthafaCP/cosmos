@@ -1,42 +1,44 @@
-import React from "react";
-import LOGO from "../Assets/LOGO.png";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { ArrowRight } from "lucide-react";
+import POSTER from "../Assets/LOGINBG4.jpg";
 
 function Landingpage() {
   const navigate = useNavigate();
 
-  const onClick = () => {
-    navigate("/HomePage");
-  };
-
   return (
-    <>
-      <motion.div className="h-screen w-screen flex flex-col items-center relative">
-        <video
-          src="https://firebasestorage.googleapis.com/v0/b/cosmos-16de1.appspot.com/o/dp%2F73477-548608749.mp4?alt=media&token=e4e08887-bf3b-45ad-a357-22b405503615"
-          autoPlay
-          loop
-          muted
-          className="absolute top-0 left-0 w-full h-full object-cover"
-        />
-        <div className="relative z-10 mt-24 flex flex-col items-center justify-center">
-          <div className="text-center flex justify-center">
-            <h2 className="text-4xl w-3/4 sm:text-6xl md:text-8xl lg:text-9xl z-10 font-poppins font-bold text-gray-100">
-              THE COSMOS
-            </h2>
-          </div>
-          <div className="w-full">
-            <button
-              onClick={onClick}
-              className="mt-14 w-full py-3 px-5 rounded tracking-wider text-lg sm:text-xl md:text-2xl font-poppins bg-transparent backdrop-blur-sm border duration-500 text-white"
-            >
-              Let's Explore
-            </button>
-          </div>
-        </div>
-      </motion.div>
-    </>
+    <motion.div className="relative flex min-h-screen w-full flex-col items-center justify-center overflow-hidden bg-black px-4">
+      {/* Background video lives in public/videos (see public/videos/README.md).
+          If the file is missing or still loading, the poster image is shown instead. */}
+      <video
+        src="/videos/cosmos-bg.mp4"
+        poster={POSTER}
+        autoPlay
+        loop
+        muted
+        playsInline
+        preload="auto"
+        aria-hidden="true"
+        className="absolute inset-0 h-full w-full object-cover"
+      />
+      <div className="absolute inset-0 bg-black/50" />
+      <div className="relative z-10 flex w-full max-w-3xl flex-col items-center text-center">
+        <h1 className="font-poppins text-5xl font-bold tracking-wide text-gray-100 sm:text-7xl md:text-8xl lg:text-9xl">
+          THE COSMOS
+        </h1>
+        <p className="mt-4 max-w-md text-base font-light text-gray-200 sm:text-lg">
+          News, discoveries and a community of people who love the universe.
+        </p>
+        <button
+          type="button"
+          onClick={() => navigate("/HomePage")}
+          className="mt-10 inline-flex items-center justify-center gap-2 rounded-full border border-white/70 bg-white/10 px-8 py-3 font-poppins text-lg tracking-wider text-white backdrop-blur-sm transition hover:bg-white hover:text-black focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black sm:text-xl"
+        >
+          Let&apos;s Explore
+          <ArrowRight className="h-5 w-5" />
+        </button>
+      </div>
+    </motion.div>
   );
 }
 
