@@ -1,146 +1,191 @@
-import React, { useEffect, useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { Search, X, Newspaper } from "lucide-react";
+import useUserData from "../utils/UserData";
+import { formatNewsDate } from "../utils/formatDate";
+import { API_URL } from "../../config";
+import SiteLayout from "../layout/SiteLayout";
+import NewsImage from "../ui/NewsPlaceholder";
+import PageHeader from "../ui/PageHeader";
+import { VideoTag } from "../ui/MediaView";
 
 function News({ setSelectedNews }) {
   const navigate = useNavigate();
+  const { valid, userData } = useUserData();
   const [news, setNews] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filteredNews, setFilteredNews] = useState([]);
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("loading");
 
+  // Wait for a pause in typing before asking the server to search.
   useEffect(() => {
-    const fetchAllNewses = async () => {
-      try {
-        const response = await axios.get(
-          "https://s50-musthafa-capstone-cosmos.onrender.com/news/getallnews"
-        );
-        console.log(response.data);
-        setNews(response.data);
-      } catch (err) {
+    const timer = setTimeout(() => setQuery(searchTerm.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const fetchPage = useCallback(
+    async (pageNumber, signal) => {
+      const response = await axios.get(`${API_URL}/news`, {
+        params: { page: pageNumber, limit: 24, q: query || undefined },
+        signal,
+      });
+      return response.data;
+    },
+    [query]
+  );
+
+  // First page (and every new search).
+  useEffect(() => {
+    const controller = new AbortController();
+    setStatus("loading");
+    fetchPage(1, controller.signal)
+      .then((data) => {
+        setNews(data.items || []);
+        setTotal(data.total || 0);
+        setHasMore(Boolean(data.hasMore));
+        setPage(1);
+        setStatus("ready");
+      })
+      .catch((err) => {
+        if (axios.isCancel(err)) return;
         console.error("Error fetching news:", err);
-      }
-    };
+        setStatus("error");
+      });
+    return () => controller.abort();
+  }, [fetchPage]);
 
-    fetchAllNewses();
-  }, []);
-
-  useEffect(() => {
-    const filtered = news.filter(
-      (item) =>
-        item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.description.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    setFilteredNews(filtered);
-  }, [searchTerm, news]);
+  const loadMore = async () => {
+    setLoadingMore(true);
+    try {
+      const data = await fetchPage(page + 1);
+      setNews((current) => [...current, ...(data.items || [])]);
+      setHasMore(Boolean(data.hasMore));
+      setPage(page + 1);
+    } catch (err) {
+      console.error("Error fetching more news:", err);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const handleNewsClick = (detail) => {
     setSelectedNews(detail);
-    navigate("/selenews");
-  };
-
-  const navigateBack = () => {
-    navigate("/HomePage");
+    navigate(`/news/${detail._id}`);
   };
 
   return (
-    <>
-      <div className="px-6 py-10">
-        <nav className="flex px-10 items-center justify-between bg-gray-100">
-          <div className="w-full">
-            <div className="flex items-center gap-3">
-              <span
-                className="mr-2 hover:cursor-pointer"
-                onClick={navigateBack}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth="1.5"
-                  stroke="currentColor"
-                  className="w-10 h-10 transform rotate-180"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M4.5 12h15m0 0l-6.75-6.75M19.5 12l-6.75 6.75"
-                  ></path>
-                </svg>
-              </span>
-              <h2 className="text-4xl font-bold tracking-widest">
-                NEWS UPDATES
-              </h2>
+    <SiteLayout valid={valid} userData={userData}>
+      <PageHeader
+        eyebrow="Space news"
+        title="News updates"
+        description="The latest discoveries, launches and missions from around the universe."
+      >
+        <div className="relative w-full sm:w-80">
+          <label htmlFor="news-search" className="sr-only">
+            Search news
+          </label>
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+          <input
+            id="news-search"
+            type="search"
+            placeholder="Search news"
+            className="d-input pl-9 pr-9"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          {searchTerm && (
+            <button
+              type="button"
+              aria-label="Clear search"
+              onClick={() => setSearchTerm("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-gray-400 hover:text-white"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </PageHeader>
+
+
+      {status === "loading" && (
+        <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" role="status" aria-label="Loading news">
+          {Array.from({ length: 8 }, (_, i) => (
+            <div key={i} className="d-card animate-pulse overflow-hidden">
+              <div className="aspect-video bg-white/5" />
+              <div className="space-y-2 p-4">
+                <div className="h-4 w-4/5 rounded bg-white/10" />
+                <div className="h-3 w-full rounded bg-white/5" />
+                <div className="h-3 w-2/3 rounded bg-white/5" />
+              </div>
             </div>
+          ))}
+        </div>
+      )}
+
+      {status === "error" && (
+        <p className="mt-16 text-center text-gray-400">
+          Could not load the news right now. Please try again later.
+        </p>
+      )}
+
+      {status === "ready" && news.length === 0 && (
+        <div className="mt-16 flex flex-col items-center gap-2 text-center text-gray-400">
+          <Newspaper className="h-8 w-8" />
+          <p>{query ? "No news matches your search." : "No news available yet."}</p>
+        </div>
+      )}
+
+      {status === "ready" && news.length > 0 && (
+        <>
+          <p className="mt-6 text-sm text-gray-500">
+            {total} {total === 1 ? "story" : "stories"}
+          </p>
+          <div className="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {news.map((detail) => (
+              <button
+                key={detail._id}
+                type="button"
+                onClick={() => handleNewsClick(detail)}
+                className="d-card d-card-hover group flex flex-col overflow-hidden text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+              >
+                <div className="overflow-hidden">
+                  <NewsImage
+                    className="aspect-video w-full object-cover transition duration-500 group-hover:scale-105"
+                    item={detail}
+                    alt=""
+                  />
+                </div>
+                <div className="flex flex-1 flex-col p-4">
+                  {detail.video && <VideoTag className="mb-2 self-start" />}
+                  <h2 className="line-clamp-2 font-semibold leading-snug group-hover:text-sky-200">{detail.title}</h2>
+                  <p className="mt-2 line-clamp-3 text-sm text-gray-400">{detail.description}</p>
+                  <p className="mt-auto pt-4 text-xs text-gray-500">
+                    {[detail.newsSite, formatNewsDate(detail.publishedAt)].filter(Boolean).join(" · ")}
+                  </p>
+                </div>
+              </button>
+            ))}
           </div>
-          <div className="w-full">
-            <div className="flex w-3/4 my-6 rounded-lg shadow-sm">
-              <input
-                type="text"
-                id="hs-trailing-button-add-on-with-icon"
-                name="hs-trailing-button-add-on-with-icon"
-                placeholder="Search here"
-                className="py-3 border px-4 block w-full shadow-lg rounded-s-lg text-sm focus:z-10 disabled:opacity-50 bg-white disabled:pointer-events-none outline-none"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+          {hasMore && (
+            <div className="mt-10 flex justify-center">
               <button
                 type="button"
-                className="w-[2.875rem] h-[2.875rem] flex-shrink-0 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-e-md border border-transparent bg-black text-white hover:bg-gray-800 duration-500 disabled:opacity-50"
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="rounded-lg border border-white/20 px-5 py-2 text-sm font-medium text-white transition hover:bg-white/10 disabled:opacity-50"
               >
-                <svg
-                  className="flex-shrink-0 size-4"
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="11" cy="11" r="8" />
-                  <path d="m21 21-4.3-4.3" />
-                </svg>
+                {loadingMore ? "Loading…" : "Load more stories"}
               </button>
             </div>
-          </div>
-        </nav>
-
-        {/* NEWS PAGE */}
-        <div className="">
-          <div className="my-10 mx-5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-7">
-            {filteredNews &&
-              filteredNews.map((detail, index) => (
-                <div
-                  key={index}
-                  className="hover:shadow-lg duration-300 border text-white cursor-pointer rounded-xl"
-                  onClick={() => handleNewsClick(detail)}
-                >
-                  <div className="w-full rounded-lg shadow-inner">
-                    <img
-                      className="rounded-lg w-full h-52"
-                      src={detail.imageUrl}
-                      alt=""
-                    />
-                  </div>
-                  <div className="p-5 w-full">
-                    <p className="text-black text-lg line-clamp-2 font-semibold">
-                      {detail.title}
-                    </p>
-                    <p className="text-gray-800 mt-2 line-clamp-2">
-                      {detail.description}
-                    </p>
-                    <p className="text-sm text-gray-600 w-full text-right mt-4">
-                      Posted on {detail.datePosted}
-                    </p>
-                  </div>
-                </div>
-              ))}
-          </div>
-        </div>
-      </div>
-    </>
+          )}
+        </>
+      )}
+    </SiteLayout>
   );
 }
 

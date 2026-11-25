@@ -1,185 +1,62 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import Cookies from "js-cookie";
 import axios from "axios";
-import WHAM from "../Assets/WHAM.png";
-import EARTH from "../Assets/EARTH.jpg";
+import { ArrowRight, ArrowUpRight, Heart, MessageCircle } from "lucide-react";
 import SOLARSYSTEM from "../Assets/SOLARSYSTEM1.webp";
-import commenticon from "../Assets/commenticon.png";
+import BLACKHOLE from "../Assets/blackhole.webp";
 import useUserData from "./utils/UserData";
+import { API_URL } from "../config";
+import SiteLayout from "./layout/SiteLayout";
+import SectionHeading from "./ui/SectionHeading";
+import SafeImage from "./ui/SafeImage";
+import NewsImage from "./ui/NewsPlaceholder";
+import MediaView, { apodMedia, VideoTag } from "./ui/MediaView";
+import Avatar from "./ui/Avatar";
+import { TOPIC_OPTIONS } from "./Forms/topics";
 
 function HomePage({ setSelectedNews }) {
   const { valid, userData, loading, setLoading } = useUserData();
   const navigate = useNavigate();
-  const [apod, setAPOD] = useState([]);
+  const [apod, setAPOD] = useState(null);
   const [newsData, setNewsData] = useState([]);
-  const [isLogoutPopupOpen, setLogoutPopupOpen] = useState(false);
-  const [userposts, setUserposts] = useState(false);
+  const [userposts, setUserposts] = useState([]);
+  const [showFullApod, setShowFullApod] = useState(false);
 
   const selectedNews = (e) => {
     setSelectedNews(e);
-    navigate("/selenews");
+    navigate(`/news/${e._id}`);
   };
 
   useEffect(() => {
-    const fetchAstronomicPictureOfTheDay = async () => {
+    const load = async (path, set, label) => {
       try {
-        const response = await axios.get(
-          "https://s50-musthafa-capstone-cosmos.onrender.com/news/apod"
-        );
-        setAPOD(response.data);
+        const response = await axios.get(`${API_URL}${path}`);
+        set(response.data);
       } catch (err) {
-        console.log("Error while fetching APOD", err);
+        console.log(`Error while fetching ${label}`, err);
       }
     };
 
-    const fetchNewsData = async () => {
-      try {
-        const response = await axios.get(
-          "https://s50-musthafa-capstone-cosmos.onrender.com/news/getrandomnews"
-        );
-        setNewsData(response.data);
-      } catch (err) {
-        console.log("Error while fetching the news data", err);
-      }
-    };
-
-    const fetchUserPosts = async () => {
-      try {
-        const response = await axios.get(
-          "https://s50-musthafa-capstone-cosmos.onrender.com/posts/getrandomposts"
-        );
-        setUserposts(response.data);
-      } catch (err) {
-        console.log("Error while fetching userPosts", err);
-      }
-    };
-
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 1000);
-
-    fetchAstronomicPictureOfTheDay();
-    fetchNewsData();
-    fetchUserPosts();
+    const timer = setTimeout(() => setLoading(false), 1000);
+    load("/news/apod", setAPOD, "APOD");
+    load("/news/latest", setNewsData, "the news data");
+    load("/posts/getrandomposts", setUserposts, "userPosts");
     return () => clearTimeout(timer);
-  }, []);
-
-  const onClick = (e) => {
-    if (e === "signup") {
-      navigate("/signup");
-    } else if (e === "login") {
-      navigate("/login");
-    }
-  };
-
-  const NavigateTopics = (e) => {
-    switch (e) {
-      case "SOLAR SYSTEM":
-        navigate("/solarsystem");
-        break;
-      case "STARS":
-        navigate("/stars");
-        break;
-      case "GALAXIES":
-        navigate("/galaxies");
-        break;
-      case "NEBULAE":
-        navigate("/nebulas");
-        break;
-      case "BLACK HOLES":
-        navigate("/blackholes");
-        break;
-      default:
-        break;
-    }
-  };
-
-  const LogOut = async () => {
-    await axios
-      .get("https://s50-musthafa-capstone-cosmos.onrender.com/auth/logout")
-      .then((res) => {
-        setLogoutPopupOpen(false);
-        console.log(res.data);
-        if (res.status === 200) {
-          window.location.reload();
-        } else {
-          console.error("Error while logging out:", response.data);
-        }
-      })
-      .catch((err) => {
-        console.log("Error while loggin out", err);
-      });
-  };
-
-  const ProfileClick = (e) => {
-    switch (e) {
-      case "profile":
-        navigate("/profile");
-        break;
-      case "communities":
-        navigate("/communities");
-        break;
-      case "userPosts":
-        navigate("/userPosts");
-        break;
-      case "chats":
-        navigate("/chats");
-        break;
-      case "news":
-        navigate("/news");
-        break;
-      case "settings":
-        navigate("/settings");
-        break;
-      case "logout":
-        LogOut();
-        break;
-      default:
-        break;
-    }
-  };
-
-  useEffect(() => {
-    if (isLogoutPopupOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "auto";
-    }
-    return () => {
-      document.body.style.overflow = "auto";
-    };
-  }, [isLogoutPopupOpen]);
+  }, [setLoading]);
 
   const topics = [
-    {
-      name: "SOLAR SYSTEM",
-      imageUrl: SOLARSYSTEM,
-    },
-    {
-      name: "STARS",
-      imageUrl: "https://cdn.mos.cms.futurecdn.net/xKkFJqojdSd8vJuvCLs5mU.jpg",
-    },
-    {
-      name: "GALAXIES",
-      imageUrl:
-        "https://images.pexels.com/photos/2150/sky-space-dark-galaxy.jpg?auto=compress&cs=tinysrgb&w=600",
-    },
-    {
-      name: "NEBULAE",
-      imageUrl:
-        "https://media.istockphoto.com/id/1351809486/photo/abstract-deep-space-nebula-background.jpg?b=1&s=612x612&w=0&k=20&c=v3xgQPFBKo6d_EO9Qqb5jGb7k7vPCkba6NsZEPZdwZQ=",
-    },
-    {
-      name: "BLACK HOLES",
-      imageUrl:
-        "https://s.yimg.com/zb/imgv1/b58b6f08-f6a8-36cd-8731-39ced65a2b75/t_500x300",
-    },
+    { name: "Solar System", to: "/solarsystem", img: SOLARSYSTEM, blurb: "Our Sun, eight planets and everything in orbit." },
+    { name: "Stars", to: "/stars", img: "/seed-images/pleiades.jpg", blurb: "How they are born, shine and die." },
+    { name: "Galaxies", to: "/galaxies", img: "/seed-images/andromeda.jpg", blurb: "Billions of stars, bound by gravity." },
+    { name: "Nebulae", to: "/nebulas", img: "/seed-images/orion-nebula.jpg", blurb: "Stellar nurseries and cosmic clouds." },
+    { name: "Black Holes", to: "/blackholes", img: BLACKHOLE, blurb: "Where gravity wins against light." },
   ];
+  const topicLabel = (value) => TOPIC_OPTIONS.find((t) => t.value === value)?.label;
+  const [featured, ...moreNews] = newsData;
 
   if (loading) {
     return (
-      <div className="w-screen h-screen bg-black grid justify-center items-center">
+      <div className="grid h-screen w-screen place-items-center bg-black">
         <div className="loading-container">
           <div className="loader">
             <div className="spinner"></div>
@@ -189,440 +66,198 @@ function HomePage({ setSelectedNews }) {
     );
   }
 
-  const handleLogout = () => {
-    setLogoutPopupOpen(true);
-  };
-
-  const handleCancel = () => {
-    setLogoutPopupOpen(false);
-  };
+  const viewAll = "inline-flex items-center gap-1 text-sm font-medium text-gray-400 transition hover:text-white";
 
   return (
-    <>
-      {isLogoutPopupOpen && (
-        <div>
-          <div className="overlay"></div>
-          <div className="border logout-popup p-5 rounded flex flex-col justify-around text-center">
-            <h2 className="text-xl mb-5 font-poppins">
-              Are you sure you want to logout ?
+    <SiteLayout valid={valid} userData={userData}>
+      <h1 className="sr-only">COSMOS: your hub for everything space</h1>
+
+      {/* Astronomy picture of the day */}
+      {apod && apod.title && (
+        <section aria-labelledby="apod-heading" className="grid items-center gap-8 lg:grid-cols-5 lg:gap-12">
+          <div className="lg:col-span-3">
+            <MediaView
+              media={apodMedia(apod)}
+              alt={apod.title}
+              loading="eager"
+              className={`w-full rounded-2xl ring-1 ring-white/10 ${
+                apod.media_type === "video" ? "aspect-video" : "max-h-[70vh] object-cover"
+              }`}
+            />
+          </div>
+          <div className="lg:col-span-2">
+            <span className="inline-flex items-center gap-2 rounded-full border border-sky-400/30 bg-sky-400/10 px-3 py-1 text-xs font-medium uppercase tracking-widest text-sky-300">
+              <span className="h-1.5 w-1.5 rounded-full bg-sky-400" /> Picture of the day
+            </span>
+            <h2 id="apod-heading" className="mt-4 font-poppins text-3xl font-bold leading-tight sm:text-4xl">
+              {apod.title}
             </h2>
-            <div className="flex justify-evenly">
-              <button
-                className="py-2 px-5  bg-black text-white  tracking-wider "
-                onClick={() => LogOut()}
-              >
-                Yes
-              </button>
-              <button
-                className="py-2 px-5  border  text-black  hover:bg-gray-50"
-                onClick={handleCancel}
-              >
-                No
-              </button>
-            </div>
+            <p className="mt-2 text-sm text-gray-400">
+              {apod.date} &middot; Credit: {apod.copyright || "NASA"}
+            </p>
+            <p className={`mt-5 leading-relaxed text-gray-300 ${showFullApod ? "" : "line-clamp-6"}`}>
+              {apod.explanation}
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowFullApod((v) => !v)}
+              aria-expanded={showFullApod}
+              className="mt-3 text-sm font-medium text-sky-300 hover:text-sky-200"
+            >
+              {showFullApod ? "Show less" : "Read more"}
+            </button>
           </div>
-        </div>
+        </section>
       )}
-      <div className="bg-black  py-10 px-10">
-        <nav className="flex px-10 items-center justify-between py-3 bg-gray-100">
-          <div className="w-full">
-            <ul className="flex gap-5">
-              <li
-                className="text-lg font-poppins cursor-pointer hover:scale-105 duration-300 px-5"
-                onClick={() => {
-                  window.location.reload();
-                }}
-              >
-                HOME
-              </li>
-              <li
-                className="text-lg font-poppins cursor-pointer hover:scale-105 duration-300 px-5"
-                onClick={() => ProfileClick("news")}
-              >
-                NEWS
-              </li>
-              <li
-                className="text-lg font-poppins cursor-pointer hover:scale-105 duration-300 px-5"
-                onClick={() => ProfileClick("userPosts")}
-              >
-                POSTS
-              </li>
-              <li
-                className="text-lg font-poppins cursor-pointer hover:scale-105 duration-300 px-5"
-                onClick={() => ProfileClick("chats")}
-              >
-                CHATS
-              </li>
-            </ul>
+
+      {/* Latest news */}
+      {featured && (
+        <section className="mt-20" aria-labelledby="news-heading">
+          <div className="flex items-end justify-between gap-4">
+            <SectionHeading><span id="news-heading">Latest news</span></SectionHeading>
+            <Link to="/news" className={viewAll}>All news <ArrowRight className="h-4 w-4" /></Link>
           </div>
-          <div className="flex gap-10">
-            {valid ? (
-              <div
-                onClick={() => ProfileClick("profile")}
-                className="flex items-center gap-3 justify-between cursor-pointer bg-gray-200 px-3 py-2 rounded-xl"
-              >
-                <div className="rounded">
-                  <img
-                    className="rounded-lg w-12 h-8"
-                    src={userData?.profilePic}
-                  />
-                </div>
-                <div className="font-poppins text-sm">{userData?.name}</div>
-              </div>
-            ) : (
-              <>
-                <button
-                  onClick={() => onClick("login")}
-                  className="w-28 rounded-sm hover:shadow-md duration-500 py-2 my-2 bg-black font-poppins text-white "
-                >
-                  Login
-                </button>
-                <button
-                  onClick={() => onClick("signup")}
-                  className="w-28 rounded-sm hover:shadow-md duration-500 py-2 my-2 bg-black font-poppins text-white "
-                >
-                  Sign Up
-                </button>
-              </>
-            )}
-          </div>
-        </nav>
-        <div className="drawer">
-          <input id="my-drawer" type="checkbox" className="drawer-toggle " />
-          <div className="drawer-content">
-            <label htmlFor="my-drawer" className="drawer-button">
-              <img
-                src={WHAM}
-                className="w-9 drawer-button mt-10 cursor-pointer"
+          <div className="mt-6 grid gap-6 lg:grid-cols-12">
+            <button
+              type="button"
+              onClick={() => selectedNews(featured)}
+              className="group relative min-h-[22rem] overflow-hidden rounded-2xl bg-gray-900 text-left lg:col-span-7"
+            >
+              <NewsImage
+                className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                item={featured}
                 alt=""
               />
-            </label>
-          </div>
-          <div className="drawer-side ">
-            <label
-              htmlFor="my-drawer"
-              aria-label="close sidebar"
-              className="drawer-overlay"
-            ></label>
+              <span className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
+              <span className="absolute inset-x-0 bottom-0 p-6 sm:p-8">
+                <span className="flex items-center gap-2 text-xs font-medium uppercase tracking-widest text-sky-300">
+                  Featured {featured.video && <VideoTag />}
+                </span>
+                <h3 className="mt-2 line-clamp-3 font-poppins text-2xl font-bold leading-snug sm:text-3xl">
+                  {featured.title}
+                </h3>
+                <p className="mt-2 line-clamp-2 max-w-2xl text-sm text-gray-300 sm:text-base">{featured.description}</p>
+              </span>
+            </button>
 
-            <ul className="menu pt-10 p-7 w-[20vw] min-h-full z-50 bg-white flex items-center text-base-content">
-              <li className="w-full" onClick={() => ProfileClick("profile")}>
-                <div className="w-full  text-black flex gap-5  shadow-lg hover:bg-gray-300">
-                  <img
-                    className="w-16 h-16 rounded-lg mb-2"
-                    src={userData?.profilePic || "https://cdn-icons-png.flaticon.com/512/149/149071.png"}
-                    alt="Profile"
-                  />
-                  <h2 className="text-center  font-semibold text-lg mb-2">
-                    {userData?.name || "Guest"}
-                  </h2>
-                </div>
-              </li>
-              <div className="mt-14 text-start text-black w-full">
-                <h2 className="font-poppins font-semibold text-3xl">EXPLORE</h2>
-              </div>
-              <li className="dropdown mt-5 w-full dropdown-right">
-                <button className=" text-black flex justify-between w-full font-poppins mt-4 py-3 border shadow-md rounded-sm">
-                  <span>EXPLORE TOPICS</span>
-                  <span>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      strokeWidth="1.5"
-                      stroke="currentColor"
-                      className="w-5 h-5"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M4.5 12h15m0 0l-6.75-6.75M19.5 12l-6.75 6.75"
-                      ></path>
-                    </svg>
+            <div className="flex flex-col gap-4 lg:col-span-5">
+              {moreNews.map((news) => (
+                <button
+                  key={news._id}
+                  type="button"
+                  onClick={() => selectedNews(news)}
+                  className="group flex flex-1 gap-4 overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] p-3 text-left transition hover:border-white/25 hover:bg-white/[0.06]"
+                >
+                  <NewsImage className="h-24 w-28 shrink-0 rounded-lg object-cover sm:h-28 sm:w-36" item={news} alt="" />
+                  <span className="min-w-0 self-center">
+                    {news.video && <VideoTag className="mb-1" />}
+                    <h3 className="line-clamp-2 font-semibold leading-snug group-hover:text-sky-200">{news.title}</h3>
+                    <p className="mt-1 line-clamp-2 text-sm text-gray-400">{news.description}</p>
                   </span>
                 </button>
-                <ul
-                  tabIndex={0}
-                  className="dropdown-content z-[1] menu p-2 shadow bg-white text-black rounded-sm w-52"
-                >
-                  {topics.map((topic, index) => {
-                    return (
-                      <li
-                        key={index}
-                        onClick={() => NavigateTopics(topic.name)}
-                      >
-                        <a className="hover:shadow-md rounded-sm duration-200">
-                          {topic.name}
-                        </a>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </li>
-              <li className=" w-full" onClick={() => ProfileClick("userPosts")}>
-                <button className=" text-black font-poppins mt-4 py-3 px-5 border shadow-md rounded-sm">
-                  USER POSTS
-                </button>
-              </li>
-              <li className=" w-full" onClick={() => ProfileClick("news")}>
-                <button className=" text-black font-poppins mt-4 py-3 px-5 border shadow-md rounded-sm">
-                  NEWS
-                </button>
-              </li>
-              <li
-                className="w-full"
-                onClick={() => ProfileClick("chats")}
-              >
-                <button className=" text-black font-poppins mt-4 py-3 border shadow-md rounded-sm">
-                  CHATS
-                </button>
-              </li>
-              <li className="w-full" onClick={() => ProfileClick("settings")}>
-                <button className=" text-black font-poppins mt-4 py-3 border shadow-md rounded-sm">
-                  SETTINGS
-                </button>
-              </li>
-              <li className="w-full" onClick={() => handleLogout()}>
-                <button className=" text-black font-poppins mt-4 py-3 border shadow-md rounded-sm">
-                  LOGOUT
-                </button>
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        {/* Astronimc picture of the day */}
-        {apod.length != 0 ? (
-          <div>
-            <h1 className="text-3xl mt-7 text-white font-bold font-poppins">
-              ASTRONOMIC PICTURE OF THE DAY
-            </h1>
-            <div className="flex justify-center">
-              <div className="">
-                <h2 className="text-2xl mt-8 text-white">
-                  Title - <strong>{apod.title}</strong>
-                </h2>
-                <div className="w-[50vw]">
-                  {apod.media_type === "image" ? (
-                    <img className="mt-5" src={apod.hdurl} alt={apod.title} />
-                  ) : (
-                    <iframe
-                      className="mt-5 h-lvh w-full"
-                      src={apod.url}
-                      title={apod.title}
-                      allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    ></iframe>
-                  )}
-                </div>
-                <div className="mt-2 flex justify-between">
-                  <p className="font-light text-white">Credits : NASA</p>
-                  <p className="font-light text-white">Date : {apod.date}</p>
-                </div>
-              </div>
-            </div>
-            <p className= "text-lg quicksand-font mt-6 text-white">
-              <strong>Explanation :</strong> {apod.explanation}
-            </p>
-          </div>
-        ) : (
-          <></>
-        )}
-
-        {/* latest news */}
-        {newsData.length === 0 ? (
-          <></>
-        ) : (
-          <div className="mt-10">
-            <h2 className="text-3xl mt-7 text-white font-bold font-poppins">
-              LATEST NEWS
-            </h2>
-            <div className="grid lg:grid-cols-4 md:grid-cols-2 gap-10 mt-7">
-              {newsData.map((news, index) => (
-                <div
-                  key={index}
-                  onClick={() => selectedNews(news)}
-                  className="bg-white cursor-pointer overflow-auto  hover:rounded-md duration-500"
-                >
-                  <img className="w-full h-52" src={news.imageUrl} alt="" />
-                  <div className="my-3 mx-5">
-                    <h2 className="text-xl font-semibold line-clamp-2 font-poppins">
-                      {news.title}
-                    </h2>
-                    <p className="line-clamp-3">{news.description}</p>
-                  </div>
-                </div>
               ))}
             </div>
           </div>
-        )}
+        </section>
+      )}
 
-        {/* userPosts  */}
-        {userposts.length === 4 ? (
-          <div className="mt-14">
-            <h2 className="text-3xl mt-7 text-white font-bold font-poppins">
-              USER POSTS
-            </h2>
-            <div className="flex gap-5 mt-7">
-              {userposts &&
-                userposts.map((post, index) => {
-                  return (
-                    <div
-                      key={index}
-                      className="p-5 w-96 border text-white rounded-sm hover:cursor-pointer"
-                      onClick={() => {
-                        navigate("/userPosts");
-                      }}
-                    >
-                      <div
-                        className="bg-cover h-80"
-                        style={{
-                          backgroundPosition: "center",
-                          backgroundImage: `url(${post.image})`,
-                        }}
-                      ></div>
-                      <h2 className="font-poppins line-clamp-1">
-                        {post.caption}
-                      </h2>
-                      <div className="flex items-center gap-2">
-                        <div className="flex justify-center items-center gap-1">
-                          <label className="ui-bookmark">
-                            <input type="checkbox" checked />
-                            <div className="bookmark z-0">
-                              <svg
-                                viewBox="0 0 16 16"
-                                style={{ marginTop: "4px" }}
-                                className="bi bi-heart-fill mt-10"
-                                height="20"
-                                width="20"
-                                xmlns="http://www.w3.org/2000/svg"
-                              >
-                                <path
-                                  d="M8 1.314C12.438-3.248 23.534 4.735 8 15-7.534 4.736 3.562-3.248 8 1.314"
-                                  fillRule="evenodd"
-                                ></path>
-                              </svg>
-                            </div>
-                          </label>
-                          <h2 className="text-sm font-light">
-                            {post.likes.length} Likes
-                          </h2>
-                        </div>
-                        <div className="flex justify-center text-sm font-light items-center gap-1">
-                          <img src={commenticon} className="w-5" alt="" />
-                          <h2>{post.comments.length} Comments</h2>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
+      {/* Community posts */}
+      {userposts.length > 0 && (
+        <section className="mt-20" aria-labelledby="posts-heading">
+          <div className="flex items-end justify-between gap-4">
+            <SectionHeading><span id="posts-heading">From the community</span></SectionHeading>
+            <Link to="/userPosts" className={viewAll}>All posts <ArrowRight className="h-4 w-4" /></Link>
           </div>
-        ) : (
-          <></>
-        )}
-
-        {/* topics  */}
-        <div className="mt-20">
-          <h2 className="text-3xl mt-7 text-white font-bold font-poppins">
-            EXPLORE TOPICS
-          </h2>
-          <div className="grid lg:grid-cols-3 md:grid-cols-2 mb-16 gap-10 mt-10">
-            {topics.map((topic, index) => (
-              <div
-                key={index}
-                onClick={() => NavigateTopics(topic.name)}
-                className="relative h-36 z-10 shadow-sm cursor-pointer rounded-sm text-2xl font-bold bg-cover text-white pl-2 pt-24 transition duration-300 transform hover:scale-105"
-                style={{
-                  backgroundImage: `url(${topic.imageUrl})`,
-                  backgroundPosition: "center",
-                }}
+          <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {userposts.map((post) => (
+              <button
+                key={post._id}
+                type="button"
+                onClick={() => navigate("/userPosts")}
+                className="group flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] text-left transition hover:-translate-y-1 hover:border-white/25"
               >
-                <div className="absolute inset-0 bg-black opacity-40 transition duration-200 hover:opacity-0"></div>
-                <div className="relative z-10">{topic.name}</div>
-              </div>
+                <div className="relative">
+                  <SafeImage
+                    className="aspect-[4/3] w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+                    src={post.image}
+                    alt={post.caption}
+                  />
+                  {topicLabel(post.topic) && (
+                    <span className="absolute left-3 top-3 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white backdrop-blur">
+                      {topicLabel(post.topic)}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-1 flex-col p-4">
+                  <div className="flex items-center gap-2">
+                    <Avatar src={post.profilePic} name={post.name} size="xs" />
+                    <span className="truncate text-sm font-medium text-gray-200">{post.name}</span>
+                  </div>
+                  <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-gray-300">{post.caption}</p>
+                  <div className="mt-auto flex items-center gap-4 pt-4 text-sm text-gray-400">
+                    <span className="flex items-center gap-1.5">
+                      <Heart className="h-4 w-4 fill-red-500 text-red-500" /> {post.likes.length}
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <MessageCircle className="h-4 w-4" /> {post.comments.length}
+                    </span>
+                  </div>
+                </div>
+              </button>
             ))}
           </div>
+        </section>
+      )}
+
+      {/* Topics */}
+      <section className="mt-20" aria-labelledby="topics-heading">
+        <SectionHeading><span id="topics-heading">Explore topics</span></SectionHeading>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:h-[34rem] lg:grid-cols-4 lg:grid-rows-2">
+          {topics.map((topic, i) => (
+            <Link
+              key={topic.name}
+              to={topic.to}
+              className={`group relative min-h-[11rem] overflow-hidden rounded-2xl bg-gray-900 ${
+                i === 0 ? "sm:col-span-2 lg:row-span-2" : ""
+              }`}
+            >
+              <img
+                src={topic.img}
+                alt=""
+                loading="lazy"
+                className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
+              />
+              <span className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
+              <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-5">
+                <span>
+                  <span className={`block font-poppins font-bold ${i === 0 ? "text-3xl" : "text-xl"}`}>{topic.name}</span>
+                  <span className="mt-1 block text-sm text-gray-300">{topic.blurb}</span>
+                </span>
+                <ArrowUpRight className="h-5 w-5 shrink-0 transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+              </span>
+            </Link>
+          ))}
         </div>
-      </div>
+      </section>
 
-      {/* footer about */}
-      <footer className="bg-black  text-white px-20 py-8">
-        <div className=" grid grid-cols-2 w-full">
-          <div className=" md:mb-0">
-            <h3 className="text-lg font-bold">Follow</h3>
-            <div className="mt-4">
-              <h1 className="text-lg">Visit Us</h1>
-              <div className="font-light">
-                <p>
-                  30 Lamb's Conduit Street
-                  <br />
-                  Bloomsbury, London
-                  <br />
-                  WC1N 3LE
-                </p>
-                <p>
-                  <a
-                    href="mailto:musthafacp0007@gmail.com"
-                    className="underline"
-                  >
-                    musthafacp0007@gmail.com
-                  </a>
-                </p>
-                <p>+91 90 3797 2149</p>
-              </div>
-            </div>
+      {/* Join CTA */}
+      {!valid && (
+        <section className="mt-20 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-sky-500/10 via-indigo-500/10 to-transparent px-6 py-12 text-center sm:px-12">
+          <h2 className="font-poppins text-2xl font-bold sm:text-3xl">Join the COSMOS community</h2>
+          <p className="mx-auto mt-3 max-w-xl text-gray-300">
+            Share your astrophotography, discuss the latest discoveries and chat with fellow stargazers.
+          </p>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <Link to="/signup" className="rounded-full bg-white px-6 py-2.5 text-sm font-semibold text-black hover:bg-sky-50">
+              Create a free account
+            </Link>
+            <Link to="/login" className="rounded-full border border-white/20 px-6 py-2.5 text-sm font-medium hover:bg-white/10">
+              Log in
+            </Link>
           </div>
-
-          <div className="">
-            <div className="flex items-center">
-              <ul className="flex flex-wrap text-lg font-semibold">
-                <li className="mr-6">
-                  <Link
-                    onClick={() => {
-                      window.location.reload();
-                    }}
-                    className="hover:text-gray-300"
-                  >
-                    Home
-                  </Link>
-                </li>
-                <li className="mr-6">
-                  <Link to="/about" className="hover:text-gray-300">
-                    About Us
-                  </Link>
-                </li>
-                <li className="mr-6">
-                  <a
-                    href="https://www.linkedin.com/in/musthafa-cp-312b59287"
-                    className="hover:text-gray-300"
-                  >
-                    Linkedin
-                  </a>
-                </li>
-                <li className="mr-6">
-                  <Link to="/about" className="hover:text-gray-300">
-                    Contact
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <h3 className="text-lg mb-2 mt-4 font-bold">Journal</h3>
-
-            <p className="font-light">
-              Join us on this celestial journey as we embark on a quest to
-              unravel the mysteries of the cosmos together. Welcome aboard!
-            </p>
-
-            <div className="mt-2">
-              <p className="text-sm">
-                &copy; 2024 40 Musthafa cp. Powered by NASA
-              </p>
-            </div>
-          </div>
-        </div>
-      </footer>
-    </>
+        </section>
+      )}
+    </SiteLayout>
   );
 }
 

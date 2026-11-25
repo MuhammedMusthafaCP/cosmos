@@ -1,76 +1,76 @@
 import axios from "axios";
-import React, { useEffect, useState } from "react";
-import { ShimmerPostItem } from "react-shimmer-effects";
+import { useCallback, useEffect, useState } from "react";
+import { API_URL } from "../../config";
+import MediaView, { apodMedia } from "../ui/MediaView";
+import { EmptyState, ErrorState, PostSkeletonGrid } from "./PostFeedStates";
+import { Telescope } from "lucide-react";
+
+function AodCard({ apod }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <article className="d-card flex flex-col overflow-hidden">
+      <div className="p-4">
+        <h3 className="font-poppins text-lg font-bold leading-snug">{apod.title}</h3>
+      </div>
+      <MediaView
+        media={apodMedia(apod)}
+        alt={apod.title}
+        className={apod.media_type === "video" ? "aspect-video w-full" : "aspect-[4/3] w-full object-cover"}
+      />
+      <div className="flex flex-wrap justify-between gap-x-4 px-4 pt-3 text-xs text-gray-500">
+        <p>Credits: {apod.copyright || "NASA"}</p>
+        <p>Date: {apod.date}</p>
+      </div>
+      <div className="p-4 text-sm text-gray-300">
+        <p className={expanded ? "" : "line-clamp-4"}>
+          <strong>Explanation:</strong> {apod.explanation}
+        </p>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          className="mt-2 font-medium text-sky-300 hover:text-sky-200"
+        >
+          {expanded ? "Show less" : "Read more"}
+        </button>
+      </div>
+    </article>
+  );
+}
 
 function AllAOD() {
   const [AODS, setAODS] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  useEffect(() => {
-    const fetchALLAODs = async () => {
-      try {
-        const response = await axios.get(
-          "https://s50-musthafa-capstone-cosmos.onrender.com/news/fetchAllAods"
-        );
-        setAODS(response.data);
-        setLoading(false);
-      } catch (err) {
-        console.log("Error while fetching AOD's", err);
-        setLoading(false);
-      }
-    };
-
-    fetchALLAODs();
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(false);
+    try {
+      const response = await axios.get(`${API_URL}/news/apods`);
+      setAODS(response.data);
+    } catch (err) {
+      console.log("Error while fetching AOD's", err);
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  if (loading) return <PostSkeletonGrid count={4} />;
+  if (error) return <ErrorState message="We couldn't load the astronomy pictures." onRetry={load} />;
+  if (AODS.length === 0)
+    return <EmptyState icon={Telescope} title="No pictures available" />;
+
   return (
-    <div className="bg-white mt-5 shadow-lg">
-      {loading ? (
-        <div>
-          {[...Array(3)].map((_, index) => (
-            <ShimmerPostItem
-              key={index}
-              card
-              title
-              cta
-              imageType="thumbnail"
-              imageWidth={700}
-              imageHeight={300}
-              contentCenter
-            />
-          ))}
-        </div>
-      ) : (
-        AODS.reverse().map((apod, index) => (
-          <div key={index} className="mt-5 border px-7 py-5">
-            <h2 className="text-2xl font-bold">{apod.title}</h2>
-            <div className="flex justify-center w-full">
-              <div className="w-full">
-                {apod.media_type === "image" ? (
-                  <img className="mt-5" src={apod.hdurl} alt={apod.title} />
-                ) : (
-                  <div className=" w-full">
-                    <iframe
-                      className="mt-5 h-[40vh] w-full"
-                      src={apod.url}
-                      title={apod.title}
-                      allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    ></iframe>
-                  </div>
-                )}
-                <div className="mt-2 flex justify-between">
-                  <p className="font-light">Credits: NASA</p>
-                  <p className="font-light">Date: {apod.date}</p>
-                </div>
-              </div>
-            </div>
-            <p className="font-light mt-6">
-              <strong>Explanation:</strong> {apod.explanation}
-            </p>
-          </div>
-        ))
-      )}
+    <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+      {AODS.map((apod) => (
+        <AodCard key={apod.date} apod={apod} />
+      ))}
     </div>
   );
 }
