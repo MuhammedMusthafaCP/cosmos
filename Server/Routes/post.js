@@ -64,6 +64,55 @@ router.get("/", async (req, res) => {
   }
 });
 
+// *community feed: newest first (or most liked), filterable by topic, paginated.
+// GET /posts/feed?page=1&limit=12&topic=star&sort=latest|popular
+// Each item also carries the author's current `profilePic`.
+router.get("/feed", async (req, res) => {
+  try {
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 12, 1), 30);
+
+    const match = {};
+    if (req.query.topic !== undefined) {
+      // Plain strings only, so a crafted query object can never become a Mongo operator.
+      if (typeof req.query.topic !== "string" || !/^[A-Za-z]{1,30}$/.test(req.query.topic)) {
+        return res.status(400).json({ message: "Invalid topic" });
+      }
+      match.topic = req.query.topic;
+    }
+
+    // _id is time-ordered, so it doubles as the creation order for posts without timestamps.
+    const sort = req.query.sort === "popular" ? { likeCount: -1, _id: -1 } : { _id: -1 };
+
+    const [items, total] = await Promise.all([
+      Post.aggregate([
+        { $match: match },
+        { $addFields: { likeCount: { $size: { $ifNull: ["$likes", []] } } } },
+        { $sort: sort },
+        { $skip: (page - 1) * limit },
+        { $limit: limit },
+        {
+          $lookup: {
+            from: Profile.collection.name,
+            localField: "createdBy",
+            foreignField: "_id",
+            as: "author",
+            pipeline: [{ $project: { profilePic: 1 } }],
+          },
+        },
+        { $addFields: { profilePic: { $first: "$author.profilePic" } } },
+        { $project: { author: 0, likeCount: 0 } },
+      ]),
+      Post.countDocuments(match),
+    ]);
+
+    res.json({ items, page, limit, total, hasMore: page * limit < total });
+  } catch (error) {
+    console.error("Error fetching feed:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
 // *to get all of the posts of a particular user to show in the profile
 router.get("/getmyposts/:id", async (req, res) => {
   try {
