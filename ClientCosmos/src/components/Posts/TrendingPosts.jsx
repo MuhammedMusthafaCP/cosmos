@@ -1,9 +1,5 @@
-import React from 'react'
-
 function TrendingPosts() {
-  return (
-    <div>TrendingPosts</div>
-  )
+  return <div>TrendingPosts</div>;
 }
 
-export default TrendingPosts
+export default TrendingPosts;

@@ -1,15 +1,24 @@
 import axios from "axios";
-import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import Cookies from "js-cookie";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Plus } from "lucide-react";
 import UserPosts from "./UserPosts";
 import SavedPosts from "./SavedPosts";
 import AllAOD from "./AllAOD";
 import useUserData from "../utils/UserData";
+import { API_URL } from "../../config";
+import SiteLayout from "../layout/SiteLayout";
+import PageHeader from "../ui/PageHeader";
+import Avatar from "../ui/Avatar";
+
+const TABS = [
+  { id: "userPosts", label: "User posts", title: "User posts", blurb: "Astrophotography, observations and questions from the community." },
+  { id: "allAODS", label: "AODs", title: "Astronomy pictures", blurb: "NASA's picture of the day, collected over time." },
+  { id: "savedPosts", label: "Saved", title: "Saved posts", blurb: "Posts you bookmarked to come back to." },
+];
 
 function Posts() {
-  const { userData, setUserData } = useUserData();
-
+  const { valid, userData, setUserData } = useUserData();
   const navigate = useNavigate();
   const [randomUsers, setRandomUsers] = useState([]);
   const [activeTab, setActiveTab] = useState("userPosts");
@@ -17,110 +26,96 @@ function Posts() {
   useEffect(() => {
     const fetchRandomUsers = async () => {
       try {
-        const response = await axios.get(
-          `https://s50-musthafa-capstone-cosmos.onrender.com/users/getusersforuserpost`
-        );
+        const response = await axios.get(`${API_URL}/users/getusersforuserpost`);
         setRandomUsers(response.data);
       } catch (err) {
-        console.log("Error while fetching the user data's");
+        console.log("Error while fetching the user data's", err);
       }
     };
-
     fetchRandomUsers();
   }, []);
 
+  const onTabKeyDown = (e) => {
+    const i = TABS.findIndex((t) => t.id === activeTab);
+    let next = null;
+    if (e.key === "ArrowRight") next = (i + 1) % TABS.length;
+    if (e.key === "ArrowLeft") next = (i - 1 + TABS.length) % TABS.length;
+    if (next === null) return;
+    e.preventDefault();
+    setActiveTab(TABS[next].id);
+    document.getElementById(`tab-${TABS[next].id}`)?.focus();
+  };
+
+  const active = TABS.find((t) => t.id === activeTab);
+
   return (
-    <>
-      <div className="">
-        <div className="px-10">
-          <nav className="flex px-10 py-6 bg-gray-100 justify-between mt-7 items-center gap-3">
-            <div className="flex items-center">
-              <h2 className="text-4xl font font-bold tracking-widest">
-                {activeTab === "userPosts"
-                  ? "USER POSTS"
-                  : activeTab === "savedPosts"
-                  ? "SAVED POSTS"
-                  : "ASTRONOMIC PICTURES OF THE MONTH"}
-              </h2>
-            </div>
-            <ul className="flex text-xl justify-evenly gap-10">
-              <li
-                className="cursor-pointer"
-                onClick={() => {
-                  navigate("/HomePage");
-                }}
-              >
-                HOME
-              </li>
-              <li
-                className={`cursor-pointer ${
-                  activeTab === "userPosts" ? "font-bold" : ""
-                }`}
-                onClick={() => setActiveTab("userPosts")}
-              >
-                USER POSTS
-              </li>
-              <li
-                className={`cursor-pointer ${
-                  activeTab === "allAODS" ? "font-bold" : ""
-                }`}
-                onClick={() => setActiveTab("allAODS")}
-              >
-                AODS
-              </li>
-              <li
-                className={`cursor-pointer ${
-                  activeTab === "savedPosts" ? "font-bold" : ""
-                }`}
-                onClick={() => setActiveTab("savedPosts")}
-              >
-                SAVED
-              </li>
+    <SiteLayout valid={valid} userData={userData}>
+      <PageHeader eyebrow="Community" title={active.title} description={active.blurb}>
+        {valid && (
+          <Link to="/Postform" className="d-btn-primary">
+            <Plus className="h-4 w-4" /> New post
+          </Link>
+        )}
+      </PageHeader>
+
+      <div
+        role="tablist"
+        aria-label="Post categories"
+        className="mt-6 inline-flex gap-1 rounded-full border border-white/10 bg-white/5 p-1"
+        onKeyDown={onTabKeyDown}
+      >
+        {TABS.map((tab) => {
+          const selected = tab.id === activeTab;
+          return (
+            <button
+              key={tab.id}
+              id={`tab-${tab.id}`}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              aria-controls="posts-panel"
+              tabIndex={selected ? 0 : -1}
+              onClick={() => setActiveTab(tab.id)}
+              className={`rounded-full px-4 py-1.5 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${
+                selected ? "bg-white text-black" : "text-gray-300 hover:text-white"
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-8 grid gap-8 lg:grid-cols-[17rem_minmax(0,1fr)]">
+        <aside aria-label="Suggested users" className="min-w-0 lg:sticky lg:top-24 lg:self-start">
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-gray-500">Suggested users</h2>
+          {randomUsers.length === 0 ? (
+            <p className="text-sm text-gray-500">No suggestions right now.</p>
+          ) : (
+            <ul className="flex gap-3 overflow-x-auto pb-2 lg:max-h-[70vh] lg:flex-col lg:overflow-y-auto lg:overflow-x-hidden">
+              {randomUsers.map((user) => (
+                <li key={user._id} className="shrink-0 lg:shrink">
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/userprofile/${user._id}`)}
+                    className="d-card d-card-hover flex w-full items-center gap-3 px-3 py-2.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+                  >
+                    <Avatar src={user.profilePic} name={user.name} size="sm" />
+                    <span className="max-w-[10rem] truncate text-sm font-medium lg:max-w-none">{user.name}</span>
+                  </button>
+                </li>
+              ))}
             </ul>
-          </nav>
+          )}
+        </aside>
 
-          <div className="flex gap-20">
-            <div className="flex ml-20 justify-center mt-10">
-              <div className="w-64">
-                <h2 className="text-center text-xl font-poppins">
-                  Suggested users
-                </h2>
-                <ul className="m-2 mt-7 overflow-auto myPosts rounded-md h-96">
-                  {randomUsers.map((user, index) => (
-                    <li
-                      key={index}
-                      onClick={() => navigate(`/userprofile/${user._id}`)}
-                      className="items-center gap-4 py-3 rounded-md flex pl-6 w-full border mt-2 hover:shadow-lg duration-300 cursor-pointer"
-                    >
-                      <img
-                        className="rounded-full w-14 h-14"
-                        src={user.profilePic}
-                        alt=""
-                      />
-                      <h2 className="text-xl line-clamp-1 font-poppins">
-                        {user.name}
-                      </h2>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-
-            <div className="overflow-auto h-[81.7vh] ml-20 w-[40vw] myPosts">
-              {activeTab === "userPosts" && (
-                <UserPosts userData={userData} setUserData={setUserData} />
-              )}
-              {activeTab === "savedPosts" && (
-                <SavedPosts userData={userData} setUserData={setUserData} />
-              )}
-              {activeTab === "allAODS" && (
-                <AllAOD userData={userData} setUserData={setUserData} />
-              )}
-            </div>
-          </div>
+        <div role="tabpanel" id="posts-panel" aria-labelledby={`tab-${activeTab}`} className="min-w-0">
+          {activeTab === "userPosts" && <UserPosts userData={userData} setUserData={setUserData} />}
+          {activeTab === "savedPosts" && <SavedPosts userData={userData} setUserData={setUserData} />}
+          {activeTab === "allAODS" && <AllAOD />}
         </div>
       </div>
-    </>
+    </SiteLayout>
   );
 }
 
