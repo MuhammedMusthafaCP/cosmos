@@ -23,6 +23,17 @@ const requiredInProd = (name, devDefault) => {
 
 const port = Number(env.PORT) || 3000;
 
+// Positive integer from the environment, or `fallback` when unset/invalid.
+const positiveInt = (name, fallback) => {
+  const value = Number(env[name]);
+  return Number.isInteger(value) && value > 0 ? value : fallback;
+};
+
+const flag = (name, fallback) => {
+  if (env[name] === undefined || env[name] === "") return fallback;
+  return ["1", "true", "yes", "on"].includes(env[name].toLowerCase());
+};
+
 const config = {
   nodeEnv: env.NODE_ENV || "development",
   isProduction,
@@ -51,6 +62,23 @@ const config = {
 
   // https://api.nasa.gov, DEMO_KEY is heavily rate limited.
   nasaApiKey: env.NASA_API_KEY || "DEMO_KEY",
+
+  // How long news and pictures of the day are kept before the daily cleanup deletes them.
+  retentionDays: positiveInt("DATA_RETENTION_DAYS", 60),
+
+  // Daily sync (news + picture of the day + cleanup). See Server/jobs.
+  scheduler: {
+    // Set ENABLE_SCHEDULER=false when an external cron runs `npm run jobs:daily` instead.
+    enabled: flag("ENABLE_SCHEDULER", true),
+    // NASA publishes the picture of the day at 00:05 US Eastern (~05:05 UTC), so run after that.
+    cron: env.SYNC_CRON || "30 6 * * *",
+    timezone: env.SYNC_TIMEZONE || "UTC",
+    // Run once at boot when the last successful sync is older than this (covers sleeping hosts).
+    staleAfterHours: positiveInt("SYNC_STALE_AFTER_HOURS", 26),
+  },
+
+  // How many days of pictures of the day to backfill when they are missing.
+  apodBackfillDays: positiveInt("APOD_BACKFILL_DAYS", 14),
 
   // Avatar assigned to new users. Point this at an image in your own storage.
   defaultProfilePicUrl:

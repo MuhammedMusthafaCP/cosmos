@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "jobs:daily": "node scripts/runDailyJobs.js"
   },
   "author": "",
   "license": "ISC",
@@ -16,6 +17,7 @@
   "dependencies": {
     "axios": "^1.7.2",
     "bcrypt": "^5.1.1",
+    "cheerio": "^1.2.0",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "cosmos": "file:",
@@ -28,6 +30,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.5.1",
     "multer": "^1.4.5-lts.1",
+    "node-cron": "^4.6.0",
     "passport": "^0.7.0",
     "passport-google-oauth2": "^0.2.0",
     "socket.io": "^4.7.5",

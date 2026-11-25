@@ -29,6 +29,10 @@ const apodSchema = new mongoose.Schema(
     url: {
       type: String,
     },
+    // Poster frame for videos (direct files and embeds).
+    thumbnail_url: {
+      type: String,
+    },
   },
   {
     timestamps: true,

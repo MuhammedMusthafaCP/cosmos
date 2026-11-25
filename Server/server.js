@@ -14,9 +14,10 @@ const communityrouter = require("./Routes/community");
 const chatrouter = require("./Routes/chat");
 const newsrouter = require("./Routes/news");
 const reviewrouter = require("./Routes/reviews");
+const { startScheduler } = require("./jobs/scheduler");
 const cookieParser = require('cookie-parser')
 const app = express();
-connectDB();
+const dbReady = connectDB();
 require("./GoogleAuth/GoogleAuth");
 
 
@@ -55,3 +56,6 @@ app.use("/review", reviewrouter);
 server.listen(config.port, () => {
   console.log(`Server is running on port ${config.port} (${config.nodeEnv})`);
 });
+
+// Daily news / picture-of-the-day sync + cleanup. Starts once the database is connected.
+dbReady.then(startScheduler).catch((error) => console.error("[jobs] scheduler failed to start:", error));
