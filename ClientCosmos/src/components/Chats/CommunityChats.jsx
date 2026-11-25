@@ -1,728 +1,579 @@
-import React, { useEffect, useRef, useState } from "react";
-import userchaticon from "../../Assets/userW.png";
-import groupchaticon from "../../Assets/group-chatW.png";
-import home from "../../Assets/homeW.png";
-import more from "../../Assets/more.png";
-import useUserData from "../utils/UserData";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { io } from "socket.io-client";
-import { Drawer, Button } from "rsuite";
-import "rsuite/dist/rsuite.min.css";
 import { useForm } from "react-hook-form";
-import { Pane, FileUploader, FileCard } from "evergreen-ui";
-import { imDB } from "../Firebase/firebase";
 import { v4 } from "uuid";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { PulseLoader } from "react-spinners";
-import { toast } from "react-toastify";
+import { Compass, Plus, Users } from "lucide-react";
+import useUserData from "../utils/UserData";
+import { imDB } from "../Firebase/firebase";
+import { API_URL } from "../../config";
+import { formatListTime } from "../utils/chatTime";
+import Avatar from "../ui/Avatar";
+import ConfirmDialog from "../ui/ConfirmDialog";
+import ImagePicker from "../ui/ImagePicker";
+import ChatShell from "./ChatShell";
+import ChatSidebar, { ListMessage, ListSkeleton } from "./ChatSidebar";
+import ChatListItem from "./ChatListItem";
+import ConversationHeader from "./ConversationHeader";
+import MessageList from "./MessageList";
+import Composer, { ComposerNotice } from "./Composer";
+import EmptyPane from "./EmptyPane";
+import Sheet from "./Sheet";
+import useChatSocket from "./useChatSocket";
+import useMessages from "./useMessages";
+import { fromCommunity } from "./chatMessages";
 
-function Chats() {
-  const { userData } = useUserData();
+const PAGE = 40;
+const auth = { withCredentials: true };
+
+const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
+
+function CommunityChats() {
+  const { userData: me, valid, loading } = useUserData();
   const navigate = useNavigate();
-  const messagesEndRef = useRef(null);
-  const [communities, setCommunities] = useState([]);
-  const [selectedCommunity, setSelectedCommunity] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [newMessage, setNewMessage] = useState("");
-  const [socket, setSocket] = useState(null);
-  const [selectedSection, setSelectedSection] = useState("ALL");
-  const [isJoinPopUp, setIsJoinPopUp] = useState(false);
-  const [communityData, setCommunityData] = useState(false);
-  const [open, setOpen] = useState(false);
-  const [files, setFiles] = useState([]);
-  const { register, handleSubmit } = useForm();
-  const [communityCreationLoading, setCommunityCreationLoading] =
-    useState(false);
-  const [fileRejections, setFileRejections] = useState([]);
+  const { socket, status, send } = useChatSocket(valid);
 
-  const handleChange = React.useCallback((files) => setFiles([files[0]]), []);
-  const handleRejected = React.useCallback(
-    (fileRejections) => setFileRejections([fileRejections[0]]),
-    []
+  const [tab, setTab] = useState("joined"); // "joined" | "discover"
+  const [lists, setLists] = useState({ joined: [], discover: [] });
+  const [listStatus, setListStatus] = useState("loading");
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState(null);
+  const [unread, setUnread] = useState({});
+  const [draft, setDraft] = useState("");
+  const [sendError, setSendError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [details, setDetails] = useState(null);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null); // "delete" | "exit" | null
+  const [actionError, setActionError] = useState("");
+  const [joining, setJoining] = useState(false);
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [picture, setPicture] = useState(null);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm();
+
+  const selectedIdRef = useRef(null);
+  const firstLoad = useRef(true);
+  useEffect(() => {
+    selectedIdRef.current = selected?._id ?? null;
+  }, [selected]);
+
+  const loadLists = useCallback(async () => {
+    if (!me?._id) return;
+    try {
+      const [joined, discover] = await Promise.all([
+        axios.get(`${API_URL}/community/mycommunities/${me._id}`, auth),
+        axios.get(`${API_URL}/community/getAll/${me._id}`, auth),
+      ]);
+      setLists({ joined: joined.data, discover: discover.data });
+      setListStatus("ready");
+      // First visit: land on Discover if you haven't joined anything yet.
+      if (firstLoad.current && joined.data.length === 0) setTab("discover");
+      firstLoad.current = false;
+    } catch (error) {
+      console.error("Error fetching communities:", error);
+      setListStatus("error");
+    }
+  }, [me?._id]);
+
+  useEffect(() => {
+    loadLists();
+  }, [loadLists]);
+
+  const fetchPage = useCallback(
+    ({ before }) =>
+      axios
+        .get(`${API_URL}/chat/${selected._id}`, { params: { before, limit: PAGE }, ...auth })
+        .then((response) => response.data),
+    [selected]
   );
 
-  const handleRemove = React.useCallback(() => {
-    setFiles([]);
-    setFileRejections([]);
-  }, []);
+  const history = useMessages({
+    conversationKey: selected?._id,
+    fetchPage,
+    getTime: (message) => message.date,
+  });
+  const { append } = history;
+
+  // Live: messages for every community you belong to, and deletions.
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (!socket || !me?._id) return undefined;
 
-  const scrollToBottom = () => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  };
-
-  const handleCommunitySelect = (community) => {
-    setSelectedCommunity(community);
-    setMessages([]);
-  };
-
-  const fetchAllCommunities = async () => {
-    try {
-      const response = await axios.get(
-        `https://s50-musthafa-capstone-cosmos.onrender.com/community/getAll/${userData?._id}`
-      );
-      setCommunities(response.data);
-    } catch (error) {
-      console.error("Error fetching communities:", error);
-    }
-  };
-
-  const fetchMyCommunities = async () => {
-    console.log("dfghjk",userData?._id);
-    try {
-      const response = await axios.get(
-        `https://s50-musthafa-capstone-cosmos.onrender.com/community/mycommunities/${userData?._id}`
-      );
-      setCommunities(response.data);
-    } catch (error) {
-      console.error("Error fetching communities:", error);
-    }
-  };
-
-  useEffect(() => {
-    if (userData) {
-      if (selectedSection === "ALL") {
-        fetchAllCommunities();
-      } else {
-        fetchMyCommunities();
-      }
-    }
-  }, [selectedSection, userData]);
-
-  useEffect(() => {
-    const newSocket = io("https://s50-musthafa-capstone-cosmos.onrender.com", {
-      withCredentials: true,
-      transports: ["websocket", "polling"],
-    });
-    setSocket(newSocket);
-
-    return () => newSocket.close();
-  }, []);
-
-  useEffect(() => {
-    if (selectedCommunity && socket) {
-      socket.emit("joinCommunity", selectedCommunity._id);
-
-      socket.on("communityMessage", (newMessage) => {
-        setMessages((prevMessages) => [...prevMessages, newMessage]);
+    const onMessage = (message) => {
+      const id = String(message.communityId);
+      const lastMessage = { name: message.name, message: message.message, date: message.date };
+      setLists((current) => {
+        const index = current.joined.findIndex((c) => c._id === id);
+        if (index === -1) return current;
+        const updated = { ...current.joined[index], lastMessage };
+        return { ...current, joined: [updated, ...current.joined.filter((_, i) => i !== index)] };
       });
-
-      const fetchMessages = async () => {
-        try {
-          const response = await axios.get(
-            `https://s50-musthafa-capstone-cosmos.onrender.com/chat/${selectedCommunity._id}`
-          );
-          setMessages(response.data);
-        } catch (error) {
-          console.error("Error fetching messages:", error);
-        }
-      };
-
-      fetchMessages();
-      fetchTheCommunityData();
-
-      return () => {
-        socket.off("communityMessage");
-      };
-    }
-  }, [selectedCommunity, socket]);
-
-  const handleSendMessage = () => {
-    if (newMessage.trim()) {
-      const messagePayload = {
-        name: userData.name,
-        message: newMessage,
-        date: new Date(),
-        profile_picture: userData.profilePic,
-        communityId: selectedCommunity._id,
-      };
-
-      socket.emit("communityMessage", messagePayload);
-      setNewMessage("");
-
-      const updatedCommunities = communities.map((community) =>
-        community._id === selectedCommunity._id
-          ? { ...community, latestMessageTime: new Date() }
-          : community
-      );
-
-      updatedCommunities.sort(
-        (a, b) => (b.latestMessageTime || 0) - (a.latestMessageTime || 0)
-      );
-      setCommunities(updatedCommunities);
-    }
-  };
-
-  const fetchTheCommunityData = async () => {
-    try {
-      const response = await axios.get(
-        `https://s50-musthafa-capstone-cosmos.onrender.com/community/details/${selectedCommunity._id}`
-      );
-      setCommunityData(response.data);
-    } catch (error) {
-      console.error("Error fetching community data:", error);
-    }
-  };
-
-  const handleJoinCommunity = async () => {
-    const data = {
-      userId: userData._id,
-      communityid: selectedCommunity._id,
+      if (selectedIdRef.current === id) append(message);
+      else if (String(message.senderId) !== me._id) setUnread((counts) => ({ ...counts, [id]: (counts[id] || 0) + 1 }));
     };
+
+    const onDeleted = ({ communityId }) => {
+      setLists((current) => ({
+        joined: current.joined.filter((c) => c._id !== communityId),
+        discover: current.discover.filter((c) => c._id !== communityId),
+      }));
+      if (selectedIdRef.current === communityId) {
+        setSelected(null);
+        setDetailsOpen(false);
+        setNotice("That community was deleted by its creator.");
+      }
+    };
+
+    socket.on("communityMessage", onMessage);
+    socket.on("communityDeleted", onDeleted);
+    return () => {
+      socket.off("communityMessage", onMessage);
+      socket.off("communityDeleted", onDeleted);
+    };
+  }, [socket, me?._id, append]);
+
+  // Details drawer: description, member count, first page of members.
+  useEffect(() => {
+    if (!detailsOpen || !selected) return undefined;
+    let cancelled = false;
+    setDetails(null);
+    axios
+      .get(`${API_URL}/community/details/${selected._id}`, auth)
+      .then((response) => !cancelled && setDetails(response.data))
+      .catch((error) => console.error("Error fetching community details:", error));
+    return () => {
+      cancelled = true;
+    };
+  }, [detailsOpen, selected]);
+
+  const loadMoreMembers = async () => {
+    setLoadingMembers(true);
     try {
-      const response = await axios.post(
-        "https://s50-musthafa-capstone-cosmos.onrender.com/community/join",
-        data
-      );
-      console.log(response.data);
-      setIsJoinPopUp(true);
-    } catch (err) {
-      console.log("Error while joining", err);
+      const response = await axios.get(`${API_URL}/community/details/${selected._id}`, {
+        params: { page: details.page + 1 },
+        ...auth,
+      });
+      setDetails((current) => ({
+        ...response.data,
+        members: [...current.members, ...response.data.members],
+      }));
+    } catch (error) {
+      console.error("Error fetching more members:", error);
+    } finally {
+      setLoadingMembers(false);
     }
   };
 
-  const closeModalPP = () => {
-    document.getElementById("my_modal_1").close();
+  const openCommunity = (community) => {
+    setSelected(community);
+    setDraft("");
+    setSendError("");
+    setNotice("");
+    setUnread((counts) => ({ ...counts, [community._id]: 0 }));
   };
 
-  const onSubmit = async (data) => {
-    setCommunityCreationLoading(true);
+  const handleSend = async () => {
+    const text = draft.trim();
+    if (!text || !selected) return;
+    setSendError("");
+    const result = await send("communityMessage", { communityId: selected._id, text });
+    if (result.ok) {
+      setDraft("");
+      append(result.message);
+    } else {
+      setSendError(result.error);
+    }
+  };
+
+  const handleJoin = async () => {
+    setJoining(true);
+    setSendError("");
     try {
-      const id = userData._id;
-      const imgS = ref(imDB, `images${v4()}`);
-      const uploadData = await uploadBytes(imgS, files[0]);
-      const imageUrl = await getDownloadURL(uploadData.ref);
+      await axios.post(`${API_URL}/community/join`, { communityid: selected._id }, auth);
+      setSelected((current) => ({ ...current, isMember: true, memberCount: current.memberCount + 1 }));
+      await loadLists();
+    } catch (error) {
+      console.error("Error while joining", error);
+      setSendError("Couldn't join this community. Please try again.");
+    } finally {
+      setJoining(false);
+    }
+  };
 
-      const requestData = {
-        ...data,
-        creator: id,
-        communityprofile: imageUrl,
-      };
+  const closeCreate = () => {
+    setCreateOpen(false);
+    setCreateError("");
+  };
 
+  const onCreate = async (values) => {
+    setCreateError("");
+    setCreating(true);
+    try {
+      let communityprofile;
+      if (picture) {
+        const upload = await uploadBytes(ref(imDB, `images${v4()}`), picture);
+        communityprofile = await getDownloadURL(upload.ref);
+      }
       const response = await axios.post(
-        "https://s50-musthafa-capstone-cosmos.onrender.com/community/create",
-        requestData
+        `${API_URL}/community/create`,
+        { name: values.name, description: values.description, communityprofile },
+        auth
       );
-
-      const { community, message } = response.data;
-      console.log(community);
-      setSelectedSection("YOURS");
-      setCommunityCreationLoading(false);
-      setSelectedCommunity(community);
-      closeModalPP();
+      reset();
+      setPicture(null);
+      closeCreate();
+      setTab("joined");
+      setSearch("");
+      await loadLists();
+      openCommunity(response.data.community);
     } catch (error) {
       console.error("Error creating community:", error);
+      setCreateError(error.response?.data?.error || "Could not create the community. Please try again.");
+    } finally {
+      setCreating(false);
     }
   };
 
-  const Joined = () => {
-    setIsJoinPopUp(false);
-    navigate("/Chats");
-  };
-
-  const EnableTheDetails = () => {
-    setOpen(true);
-  };
-
-  const DeleteCommunity = async () => {
+  const leaveOrDelete = async () => {
+    setActionError("");
     try {
-      const response = await axios.delete(
-        `https://s50-musthafa-capstone-cosmos.onrender.com/community/delete/${communityData._id}`
-      );
-      window.location.reload();
-    } catch (err) {
-      console.log("Error while deleting the community");
-    }
-  };
-
-  const ExitCommunity = async () => {
-    const userID = userData._id;
-    try {
-      const response = await axios.post(
-        `https://s50-musthafa-capstone-cosmos.onrender.com/community/exit`,
-        {
-          userId: userID,
-          communityId: communityData._id,
-        }
-      );
-      window.location.reload();
-    } catch (err) {
-      console.log("Error while exiting the community", err);
-    }
-  };
-
-  // Searching part
-  const [searchTerm, setSearchTerm] = useState("");
-
-  useEffect(() => {
-    const fetchAndFilterCommunities = async () => {
-      try {
-        let response;
-        if (selectedSection === "ALL") {
-          response = await axios.get(
-            `https://s50-musthafa-capstone-cosmos.onrender.com/community/getAll/${userData?._id}`
-          );
-        } else {
-          response = await axios.get(
-            `https://s50-musthafa-capstone-cosmos.onrender.com/community/mycommunities/${userData?._id}`
-          );
-        }
-
-        const allCommunities = response.data;
-        const filtered = allCommunities.filter((community) =>
-          community.name.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-        setCommunities(filtered);
-      } catch (error) {
-        console.error("Error fetching communities:", error);
+      if (confirmAction === "delete") {
+        await axios.delete(`${API_URL}/community/delete/${selected._id}`, auth);
+      } else {
+        await axios.post(`${API_URL}/community/exit`, { communityId: selected._id }, auth);
       }
-    };
-
-    if (userData) {
-      fetchAndFilterCommunities();
+      setConfirmAction(null);
+      setDetailsOpen(false);
+      setSelected(null);
+      await loadLists();
+    } catch (error) {
+      setConfirmAction(null);
+      setActionError(error.response?.data?.message || "Something went wrong. Please try again.");
     }
-  }, [searchTerm, selectedSection, userData]);
+  };
+
+  const visible = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return lists[tab].filter(
+      (c) => (c.name || "").toLowerCase().includes(term) || (c.description || "").toLowerCase().includes(term)
+    );
+  }, [lists, tab, search]);
+
+  const messages = useMemo(
+    () => (me ? history.items.map((m) => fromCommunity(m, me)) : []),
+    [history.items, me]
+  );
+
+  const isCreator = selected && String(selected.creator) === me?._id;
+  const offline = status !== "connected";
+
+  const subFilter = (
+    <div role="tablist" aria-label="Community filter" className="grid grid-cols-2 gap-1">
+      {[
+        ["joined", "Joined", lists.joined.length],
+        ["discover", "Discover", lists.discover.length],
+      ].map(([key, label, count]) => (
+        <button
+          key={key}
+          type="button"
+          role="tab"
+          aria-selected={tab === key}
+          onClick={() => setTab(key)}
+          className={`rounded-full border px-3 py-1.5 text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${
+            tab === key
+              ? "border-sky-400 bg-sky-400/15 text-sky-200"
+              : "border-white/15 text-gray-300 hover:bg-white/10"
+          }`}
+        >
+          {label} <span className="text-xs opacity-70">{count}</span>
+        </button>
+      ))}
+    </div>
+  );
+
+  let list;
+  if (listStatus === "loading") list = <ListSkeleton />;
+  else if (listStatus === "error") {
+    list = (
+      <ListMessage icon={Users} title="Couldn't load communities">
+        <button type="button" onClick={loadLists} className="d-btn mt-2">
+          Try again
+        </button>
+      </ListMessage>
+    );
+  } else if (visible.length === 0) {
+    list =
+      search || tab === "discover" ? (
+        <ListMessage icon={Compass} title={search ? "No communities match your search" : "You've joined them all"}>
+          {search ? "Try a different word." : "Create a new community for something you love."}
+        </ListMessage>
+      ) : (
+        <ListMessage icon={Users} title="You haven't joined any communities">
+          <button type="button" onClick={() => setTab("discover")} className="d-btn mt-2">
+            Discover communities
+          </button>
+        </ListMessage>
+      );
+  } else {
+    list = (
+      <ul className="space-y-0.5">
+        {visible.map((community) => {
+          const last = community.lastMessage;
+          const mine = last && last.name === me?.name;
+          return (
+            <ChatListItem
+              key={community._id}
+              name={community.name}
+              avatar={community.communityprofile}
+              preview={last ? `${mine ? "You" : last.name}: ${last.message}` : community.description}
+              meta={plural(community.memberCount, "member")}
+              time={last ? formatListTime(last.date) : ""}
+              unread={unread[community._id] || 0}
+              selected={selected?._id === community._id}
+              onClick={() => openCommunity(community)}
+            />
+          );
+        })}
+      </ul>
+    );
+  }
 
   return (
-    <div className="h-screen w-screen flex flex-col lg:flex-row">
-      {isJoinPopUp && (
-        <div>
-          <div className="overlay"></div>
-          <div className="border logout-popup w-fit p-5 rounded flex flex-col justify-around text-center">
-            <h2 className="text-xl mb-2 font-poppins">
-              You joined the community {selectedCommunity.name}
-            </h2>
-            <div className="flex justify-end">
-              <button
-                className="py-2 px-5  bg-black text-white tracking-wider "
-                onClick={() => Joined()}
-              >
-                Yes
+    <>
+      <ChatShell
+        valid={valid}
+        userData={me}
+        title="Community chats"
+        hasSelection={Boolean(selected)}
+        connection={valid ? status : "connected"}
+        sidebar={
+          <ChatSidebar
+            active="community"
+            search={search}
+            onSearch={setSearch}
+            searchPlaceholder="Search communities"
+            subFilter={subFilter}
+            action={
+              <button type="button" onClick={() => setCreateOpen(true)} className="d-btn-primary w-full">
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                Create community
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-      <ul className="lg:h-full w-[5vw] flex lg:flex-col items-center gap-5 lg:gap-20 bg-black py-2 lg:py-10 px-4">
-        <li>
-          <img
-            className="cursor-pointer w-6"
-            onClick={() => navigate("/HomePage")}
-            src={home}
-            alt="Home"
-          />
-        </li>
-        <li>
-          <img
-            className="cursor-pointer w-6"
-            src={userchaticon}
-            alt="User Chat"
-            onClick={() => navigate("/Chats")}
-          />
-        </li>
-        <li>
-          <img
-            className="cursor-pointer w-10"
-            src={groupchaticon}
-            alt="Group Chat"
-            onClick={() => navigate("/CommunityChats")}
-          />
-        </li>
-      </ul>
-
-      {/* Main Content */}
-      <div className="w-full h-full flex flex-col">
-        <nav className="flex justify-between items-center px-4 lg:px-10 py-3 shadow-gray-200 shadow-md w-full bg-white">
-          <div className="w-full">
-            <input
-              type="text"
-              className="bg-white outline-none border py-2 rounded-xl w-full lg:w-[30vw] px-3 font-light"
-              placeholder="Search"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+            }
+          >
+            {notice && (
+              <p role="status" className="mb-2 rounded-lg bg-amber-400/10 px-3 py-2 text-xs text-amber-200">
+                {notice}
+              </p>
+            )}
+            {list}
+          </ChatSidebar>
+        }
+      >
+        {selected ? (
+          <>
+            <ConversationHeader
+              name={selected.name}
+              avatar={selected.communityprofile}
+              subtitle={`${plural(selected.memberCount, "member")} · ${selected.description}`}
+              onBack={() => setSelected(null)}
+              onDetails={() => setDetailsOpen(true)}
+              detailsLabel="Community details"
             />
-          </div>
-          <div>
-            <div
-              onClick={() => navigate("/profile")}
-              className="cursor-pointer flex items-center hover:border-gray-400 rounded-md py-1 px-3 duration-300 border border-transparent gap-2 lg:gap-6"
-            >
-              <div className="flex flex-col items-center">
-                <h2 className="font-bold text-start">
-                  {userData?.name || "Guest"}
-                </h2>
-                <p className="text-xs -mt-3 text-end">Online</p>
-              </div>
-              <div
-                className="w-10 lg:w-12 h-10 lg:h-12 bg-cover rounded-full"
-                style={{
-                  backgroundImage: `url(${
-                    userData?.profilePic || userchaticon
-                  })`,
-                  backgroundPosition: "center",
-                }}
-              ></div>
-            </div>
-          </div>
-        </nav>
-
-        {/* Chat Window */}
-        <div className="flex flex-col lg:flex-row h-full">
-          <div className="w-full lg:w-[45vh] shadow-md shadow-gray-600 p-2 h-[30vh] lg:h-full overflow-y-auto bg-white">
-            <Drawer backdrop={true} open={open} onClose={() => setOpen(false)}>
-              <div className="w-full h-full p-4 bg-white rounded-lg shadow-lg overflow-auto">
-                <h2 className="text-3xl font-bold mb-2 text-gray-800">
-                  {communityData?.name}
-                </h2>
-                <div className="flex justify-center">
-                  <div
-                    className="bg-cover w-48 h-48 rounded-md mb-4"
-                    style={{
-                      backgroundImage: `url(${communityData?.communityprofile})`,
-                      backgroundPosition: "center",
-                    }}
-                  ></div>
-                </div>
-                <p className="text-gray-700 mb-4">
-                  {communityData?.description}
-                </p>
-                <div className="h-[45vh] overflow-auto myPosts">
-                  <h3 className="text-xl font-semibold mb-2 text-gray-800">
-                    Members
-                  </h3>
-                  {communityData?.members?.length ? (
-                    <ul className="space-y-1">
-                      {communityData.members.map((member, index) => (
-                        <li
-                          key={index}
-                          className="text-gray-600 w-full flex items-center gap-3 py-2 px-3 border"
-                        >
-                          <div
-                            className="w-12 h-12 bg-cover"
-                            style={{
-                              backgroundImage: `url(${member.profilePic})`,
-                              backgroundPosition: "center",
-                            }}
-                          ></div>
-                          <h2 className="font-semibold tracking-wide">
-                            {member.name}
-                          </h2>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-gray-600">No members yet.</p>
-                  )}
-                </div>
-                <div>
-                  {userData?._id == communityData?.creator ? (
-                    <button
-                      onClick={() => DeleteCommunity()}
-                      className="bg-red-500 px-3 py-2 rounded-sm text-white"
-                    >
-                      Delete Community
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => ExitCommunity()}
-                      className="bg-red-500 px-3 py-2 rounded-sm text-white"
-                    >
-                      Exit Community
-                    </button>
-                  )}
-                </div>
-              </div>
-            </Drawer>
-            <div className="flex flex-col justify-between h-[83vh]">
-              <div className="w-full flex items-center justify-center gap-2 mb-4">
-                <button
-                  onClick={() => setSelectedSection("ALL")}
-                  className={`py-2 ${
-                    selectedSection === "ALL"
-                      ? "bg-black border-none transition duration-500 text-white"
-                      : ""
-                  } font-thin tracking-wider border w-full `}
-                >
-                  ALL
-                </button>
-                <button
-                  onClick={() => setSelectedSection("YOURS")}
-                  className={`py-2 ${
-                    selectedSection === "YOURS"
-                      ? "bg-black border-none transition duration-500 text-white"
-                      : ""
-                  } font-thin border tracking-wider w-full `}
-                >
-                  YOURS
-                </button>
-              </div>
-              <div className="overflow-auto myPosts h-full">
-                {communities.length > 0 ? (
-                  communities.map((community) => (
-                    <div
-                      key={community._id}
-                      onClick={() => handleCommunitySelect(community)}
-                      className={`w-full cursor-pointer hover:bg-gray-100 duration-300 rounded-lg px-7 py-2 flex items-center gap-4 ${
-                        selectedCommunity?._id === community._id
-                          ? "bg-gray-200"
-                          : ""
-                      }`}
-                    >
-                      <div
-                        className="w-10 bg-cover lg:w-12 h-10 lg:h-12 rounded-full"
-                        style={{
-                          backgroundImage: `url(${community.communityprofile})`,
-                          backgroundPosition: "center",
-                        }}
-                      ></div>
-                      <h2 className="text-sm lg:text-base">{community.name}</h2>
-                    </div>
-                  ))
-                ) : (
-                  <div className="h-full flex justify-center">
-                    <p className="text-gray-600 text-2xl mt-44 tracking-wider text-center w-full">No communities found.</p>
-                  </div>
+            <MessageList
+              messages={messages}
+              status={history.status}
+              hasMore={history.hasMore}
+              loadingEarlier={history.loadingEarlier}
+              onLoadEarlier={history.loadEarlier}
+              onRetry={history.retry}
+              showNames
+              emptyTitle="No messages yet"
+              emptyHint={selected.isMember ? "Be the first to say something." : "Join to start the conversation."}
+            />
+            {!selected.isMember ? (
+              <ComposerNotice>
+                {sendError && (
+                  <p role="alert" className="mb-2 rounded-lg bg-red-500/10 px-3 py-1.5 text-xs text-red-300">
+                    {sendError}
+                  </p>
                 )}
-              </div>
-              <div>
-                <button
-                  onClick={() =>
-                    document.getElementById("my_modal_1").showModal()
-                  }
-                  className="w-full bg-black text-white tracking-wider py-2"
-                >
-                  CREATE COMMUNITY
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm text-gray-400">You&apos;re previewing this community.</p>
+                  <button type="button" onClick={handleJoin} disabled={joining} className="d-btn-primary">
+                    {joining ? "Joining…" : "Join community"}
+                  </button>
+                </div>
+              </ComposerNotice>
+            ) : status === "unauthorized" ? (
+              <ComposerNotice>
+                <button type="button" onClick={() => navigate("/login")} className="d-btn-primary w-full">
+                  Log in again to send messages
                 </button>
-              </div>
+              </ComposerNotice>
+            ) : (
+              <Composer
+                value={draft}
+                onChange={setDraft}
+                onSend={handleSend}
+                disabled={offline}
+                placeholder={offline ? "Reconnecting…" : `Message ${selected.name}`}
+                error={sendError}
+              />
+            )}
+          </>
+        ) : (
+          <EmptyPane icon={Users} title="Community chats">
+            Join a community to talk with people who share your interests, or create your own.
+          </EmptyPane>
+        )}
+      </ChatShell>
+
+      {/* Community details drawer */}
+      <Sheet open={detailsOpen} side title={selected?.name || "Community"} onClose={() => setDetailsOpen(false)}>
+        {details ? (
+          <div>
+            <div className="flex flex-col items-center text-center">
+              <Avatar src={details.communityprofile} name={details.name} size="xl" />
+              <p className="mt-3 text-sm text-gray-400">{plural(details.memberCount, "member")}</p>
             </div>
-          </div>
+            <p className="mt-4 whitespace-pre-wrap break-words text-sm text-gray-300">{details.description}</p>
 
-          <div className="myPosts mt-0">
-            <dialog id="my_modal_1" className="modal">
-              <div className="modal-box myPosts h-fit bg-white">
-                <div className="modal-action mt-0">
-                  <form method="dialog">
-                    <button className="">✕</button>
-                  </form>
-                </div>
-                <div className="flex justify-between items-center">
-                  <h3 className="font-bold text-3xl tracking-wider">
-                    CREATE YOUR COMMUNITY
-                  </h3>
-                </div>
-                <form onSubmit={handleSubmit(onSubmit)} className="py-8">
-                  <h2 className="font-light text-sm mb-1">Community name</h2>
-                  <input
-                    {...register("name")}
-                    className="bg-white pl-3 font-light rounded-md mb-5 border outline-none w-full h-10"
-                    type="text"
-                  />
-                  <h2 className="font-light text-sm mb-1">
-                    Community Description
-                  </h2>
-                  <input
-                    {...register("description")}
-                    className="bg-white pl-3 font-light rounded-md mb-5 border outline-none w-full h-10"
-                    type="text"
-                  />
-                  <h2 className="font-light text-sm mb-1">Community profile</h2>
-                  <Pane maxWidth={654}>
-                    <FileUploader
-                      maxSizeInBytes={50 * 1024 ** 2}
-                      maxFiles={1}
-                      onChange={handleChange}
-                      onRejected={handleRejected}
-                      renderFile={(file) => {
-                        const { name, size, type } = file;
-                        const fileRejection = fileRejections.find(
-                          (fileRejection) => fileRejection.file === file
-                        );
-                        const { message } = fileRejection || {};
-                        return (
-                          <FileCard
-                            key={name}
-                            isInvalid={fileRejection != null}
-                            name={name}
-                            onRemove={handleRemove}
-                            sizeInBytes={size}
-                            type={type}
-                            validationMessage={message}
-                          />
-                        );
-                      }}
-                      values={files}
-                    />
-                  </Pane>
-
+            <h3 className="mb-2 mt-6 text-xs font-semibold uppercase tracking-widest text-gray-500">Members</h3>
+            <ul className="space-y-1">
+              {details.members.map((member) => (
+                <li key={member._id}>
                   <button
-                    type="submit"
-                    className="bg-black flex justify-center items-center w-full mt-7 h-10 rounded-md text-white"
+                    type="button"
+                    onClick={() => navigate(member._id === me?._id ? "/profile" : `/userprofile/${member._id}`)}
+                    className="flex w-full items-center gap-3 rounded-xl border border-white/10 px-3 py-2 text-left transition hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
                   >
-                    {communityCreationLoading ? (
-                      <div>
-                        <PulseLoader color="#ffffff" size={11} />
-                      </div>
-                    ) : (
-                      <h2>CREATE</h2>
+                    <Avatar src={member.profilePic} name={member.name} size="md" />
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-white">{member.name}</span>
+                    {String(member._id) === String(details.creator) && (
+                      <span className="rounded-full bg-sky-400/10 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-sky-300">
+                        Creator
+                      </span>
                     )}
                   </button>
-                </form>
-              </div>
-            </dialog>
-          </div>
+                </li>
+              ))}
+            </ul>
+            {details.hasMoreMembers && (
+              <button type="button" onClick={loadMoreMembers} disabled={loadingMembers} className="d-btn mt-3 w-full">
+                {loadingMembers ? "Loading…" : "Show more members"}
+              </button>
+            )}
 
-          {/* Chat Area */}
-          <div className="w-full flex flex-col h-full">
-            {selectedCommunity ? (
-              <>
-                <nav className="w-full cursor-pointer hover:bg-slate-300 duration-300 flex justify-between items-center px-4 lg:px-10 py-3 bg-slate-200">
-                  <div className="flex items-center gap-3">
-                    <>
-                      <div className="flex justify-center gap-2">
-                        <span className="flex items-center">
-                          <svg
-                            onClick={() => setSelectedCommunity(null)}
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            strokeWidth="1.5"
-                            stroke="currentColor"
-                            className="w-7 h-7 hover:bg-slate-400 rounded-md duration-300 transform rotate-180"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M4.5 12h15m0 0l-6.75-6.75M19.5 12l-6.75 6.75"
-                            ></path>
-                          </svg>
-                        </span>
-                        <div
-                          className="w-10 lg:w-12 h-10 lg:h-12 bg-cover rounded-full"
-                          style={{
-                            backgroundImage: `url(${selectedCommunity.communityprofile})`,
-                            backgroundPosition: "center",
-                          }}
-                        ></div>
-                      </div>
-                      <h2 className="text-sm lg:text-base">
-                        {selectedCommunity.name}
-                      </h2>
-                    </>
-                  </div>
-                  <div>
-                    <img
-                      onClick={() => EnableTheDetails()}
-                      className="cursor-pointer hover:bg-slate-400 duration-500 rounded-full h-7 lg:h-9"
-                      src={more}
-                      alt="More Options"
-                    />
-                  </div>
-                </nav>
-
-                <div className=" p-3 h-[69vh] myPosts overflow-y-auto">
-                  {messages.map((message, index) => (
-                    <div
-                      key={index}
-                      className={`flex mb-2 ${
-                        message?.name === userData.name
-                          ? "justify-end"
-                          : "justify-start"
-                      }`}
-                    >
-                      <div
-                        className={`flex items-start gap-2.5 ${
-                          message?.name === userData.name
-                            ? "flex-row-reverse"
-                            : "flex-row"
-                        }`}
-                      >
-                        <img
-                          className="w-8 h-8 rounded-full"
-                          src={
-                            message?.name === userData.name
-                              ? userData.profilePic
-                              : message?.profile_picture
-                          }
-                          alt="profile"
-                        />
-                        <div
-                          className={`flex flex-col w-full max-w-[320px] leading-1.5 px-4 py-3  ${
-                            message?.name === userData.name
-                              ? "bg-gray-700 text-white rounded-s-xl rounded-e-xl"
-                              : "bg-gray-100 text-black rounded-e-xl rounded-s-xl"
-                          }`}
-                        >
-                          <div className="flex items-center space-x-2 rtl:space-x-reverse">
-                            <span className="text-sm font-semibold">
-                              {message?.name === userData.name
-                                ? "You"
-                                : message?.name}
-                            </span>
-                          </div>
-                          <p className="text-sm font-normal py-2.5">
-                            {message?.message}
-                          </p>
-                          <span className="text-sm text-end font-normal text-gray-500 dark:text-gray-400">
-                            {new Date(message?.date).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-
-                  <div ref={messagesEndRef} />
-                </div>
-
-                <div className="w-full px-4 lg:px-6 py-2 flex items-center gap-2">
-                  {selectedCommunity?.members.includes(userData._id) ? (
-                    <>
-                      <input
-                        type="text"
-                        className="flex-grow font-light bg-white px-4 py-2 outline-none border rounded-sm"
-                        placeholder="Type your message..."
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        onKeyPress={(e) =>
-                          e.key === "Enter" && handleSendMessage()
-                        }
-                      />
-                      <button
-                        onClick={handleSendMessage}
-                        className="bg-gray-600 text-white rounded-sm px-4 py-2 duration-300 hover:bg-gray-900"
-                      >
-                        Send
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      onClick={handleJoinCommunity}
-                      className="bg-gray-500 font-bold tracking-widest text-white rounded-sm px-4 py-2 w-full duration-300 hover:bg-gray-700"
-                    >
-                      JOIN
-                    </button>
-                  )}
-                </div>
-              </>
-            ) : (
-              <div className="flex justify-center items-center h-full">
-                <p className="text-gray-500 text-2xl tracking-wider font-bold">
-                  Select a community to start chatting
-                </p>
+            {selected?.isMember && (
+              <div className="mt-8 border-t border-white/10 pt-5">
+                {actionError && (
+                  <p role="alert" className="mb-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">
+                    {actionError}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setConfirmAction(isCreator ? "delete" : "exit")}
+                  className="d-btn-danger w-full"
+                >
+                  {isCreator ? "Delete community" : "Leave community"}
+                </button>
               </div>
             )}
           </div>
-        </div>
-      </div>
-    </div>
+        ) : (
+          <p className="text-sm text-gray-500">Loading details…</p>
+        )}
+      </Sheet>
+
+      {/* Create community */}
+      <Sheet open={createOpen} title="Create a community" onClose={closeCreate}>
+        <form onSubmit={handleSubmit(onCreate)} noValidate className="space-y-4">
+          <div>
+            <label htmlFor="community-name" className="mb-1 block text-sm font-medium text-gray-300">
+              Name
+            </label>
+            <input
+              id="community-name"
+              type="text"
+              maxLength={60}
+              className="d-input"
+              aria-invalid={errors.name ? "true" : "false"}
+              {...register("name", {
+                validate: (v) => (v.trim().length >= 2 ? true : "Give it a name of at least 2 characters"),
+              })}
+            />
+            {errors.name && <p className="mt-1 text-xs text-red-400">{errors.name.message}</p>}
+          </div>
+          <div>
+            <label htmlFor="community-desc" className="mb-1 block text-sm font-medium text-gray-300">
+              What is it about?
+            </label>
+            <textarea
+              id="community-desc"
+              rows={3}
+              maxLength={300}
+              className="d-input resize-none"
+              aria-invalid={errors.description ? "true" : "false"}
+              {...register("description", {
+                validate: (v) => (v.trim() ? true : "Tell people what this community is about"),
+              })}
+            />
+            {errors.description && <p className="mt-1 text-xs text-red-400">{errors.description.message}</p>}
+          </div>
+          <ImagePicker file={picture} onChange={setPicture} label="Picture (optional)" />
+          {createError && (
+            <p role="alert" className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">
+              {createError}
+            </p>
+          )}
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={closeCreate} className="d-btn">
+              Cancel
+            </button>
+            <button type="submit" disabled={creating} className="d-btn-primary min-w-[6rem]">
+              {creating ? <PulseLoader color="#000000" size={8} /> : "Create"}
+            </button>
+          </div>
+        </form>
+      </Sheet>
+
+      <ConfirmDialog
+        open={confirmAction !== null}
+        danger
+        title={confirmAction === "delete" ? "Delete this community?" : "Leave this community?"}
+        message={
+          confirmAction === "delete"
+            ? "This permanently removes the community and its messages for all members."
+            : "You will no longer receive messages from this community."
+        }
+        confirmLabel={confirmAction === "delete" ? "Delete" : "Leave"}
+        onConfirm={leaveOrDelete}
+        onCancel={() => setConfirmAction(null)}
+      />
+
+      <ConfirmDialog
+        open={!loading && !valid}
+        title="Please log in to continue"
+        message="You need to be signed in to use chats."
+        confirmLabel="Login"
+        cancelLabel="Cancel"
+        onConfirm={() => navigate("/login")}
+        onCancel={() => navigate("/HomePage")}
+      />
+    </>
   );
 }
 
-export default Chats;
+export default CommunityChats;
