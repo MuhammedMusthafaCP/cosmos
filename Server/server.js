@@ -43,7 +43,7 @@ app.use(
   })
 );
 
-setupSocket(server);
+app.set("io", setupSocket(server));
 
 app.use("/users", userrouter);
 app.use("/posts", postrouter);

@@ -14,6 +14,11 @@ const messageItemSchema = new mongoose.Schema({
     required: true,
     default: Date.now,
   },
+  // Author's profile id (older messages only have `name`).
+  senderId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Profile",
+  },
   profile_picture: {
     type: String,
     ref: "Profile",
